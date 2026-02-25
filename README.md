@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./icon.png" width="180"/>
+  <img src="https://github.com/kaiCATs/pet-reminder/blob/main/icon.png?raw=true" width="180">
 </p>
 
-<h1 align="center">🐾 Pet Reminder v9.0</h1>
+# 🐾 Pet Reminder v9.0
 
 <p align="center">
 Lightweight desktop companion with smart reminders
