@@ -1,3 +1,15 @@
+<p align="center">
+  <img src="icon.png" width="180">
+</p>
+
+<h1 align="center">🐾 Pet Reminder v9.0</h1>
+
+<p align="center">
+Lightweight desktop companion with smart reminders
+</p>
+
+---
+
 # 🐾 Pet Reminder v9.0
 
 Pet Reminder — это desktop-приложение с анимированным питомцем и системой напоминаний.
