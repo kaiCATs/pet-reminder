@@ -2,12 +2,6 @@
   <img src="Icon.png" width="180">
 </p>
 
-## 🐾 Pet Reminder v9.0
-
-<p align="center">
-Lightweight desktop companion with smart reminders
-</p>
-
 ---
 
 # 🐾 Pet Reminder v9.0
