@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" width="180">
+  <img src="Icon.png" width="180">
 </p>
 
 ## 🐾 Pet Reminder v9.0
