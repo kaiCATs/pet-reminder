@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" width="180">
+  <img src="https://raw.githubusercontent.com/kaiCATs/pet-reminder/main/icon.png" width="180">
 </p>
 
 <h1 align="center">🐾 Pet Reminder v9.0</h1>
