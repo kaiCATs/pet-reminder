@@ -112,9 +112,11 @@ python pet.py
 ```bash
 pyinstaller --noconfirm --clean --onefile --windowed ^
 --icon=icon.ico ^
+--version-file=version.txt ^
 --add-data "idle_clean;idle_clean" ^
 --add-data "click_clean;click_clean" ^
 --add-data "sleeping_clean;sleeping_clean" ^
+--add-data "icon.png;." ^
 pet.py
 ```
 
