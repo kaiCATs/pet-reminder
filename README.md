@@ -109,14 +109,14 @@ pet-reminder/
 │
 ├── pet.py
 ├── icon.ico
-├── icon.png
+├── Icon.png
 ├── version.txt
 ├── idle_clean/
 ├── click_clean/
 └── sleeping_clean/
 ```
 
-⚠️ Файлы `icon.ico` и `icon.png` должны лежать рядом с `pet.py`.
+⚠️ Файлы `icon.ico` и `Icon.png` должны лежать рядом с `pet.py`.
 
 ---
 
@@ -164,7 +164,7 @@ python pet.py
 ## ❗ Важно
 
 - Запускать нужно **из корневой папки**, где лежит `pet.py`.
-- Файлы `icon.ico` и `icon.png` должны находиться рядом с `pet.py`.
+- Файлы `icon.ico` и `Icon.png` должны находиться рядом с `pet.py`.
 - Папки `idle_clean`, `click_clean`, `sleeping_clean` должны быть в той же директории.
 - Если запустить из другой папки — иконка или анимации не загрузятся.
 
@@ -179,7 +179,7 @@ pyinstaller --noconfirm --clean --onefile --windowed ^
 --add-data "idle_clean;idle_clean" ^
 --add-data "click_clean;click_clean" ^
 --add-data "sleeping_clean;sleeping_clean" ^
---add-data "icon.png;." ^
+--add-data "Icon.png;." ^
 pet.py
 ```
 
