@@ -2,7 +2,7 @@
   <img src="Icon.png" width="200">
 </p>
 
-<h1 align="center">🐾 Pet Reminder v9.0</h1>
+<h1 align="center">🐾 Pet Reminder v10.0</h1>
 
 <p align="center">
 Desktop-питомец с системой умных напоминаний<br>
@@ -10,8 +10,8 @@ Desktop-питомец с системой умных напоминаний<br>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-9.0-blue">
-  <img src="https://img.shields.io/badge/python-3.10+-yellow">
+  <img src="https://img.shields.io/badge/version-10.0-blue">
+  <img src="https://img.shields.io/badge/python-3.14+-yellow">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey">
   <img src="https://img.shields.io/badge/status-stable-brightgreen">
 </p>
@@ -67,7 +67,7 @@ Desktop-питомец с системой умных напоминаний<br>
 🔔 Показать ближайший ДР
 🗓 События
 -----------------
-Pet Reminder v9.0
+Версия v10.0
 ❌ Выход
 ```
 
@@ -82,10 +82,12 @@ Pet Reminder v9.0
 ```
 
 Файлы:
-- birthdays.json
-- birthday_notified.json
-- events.json
-- events_notified.json
+- birthdays.json  
+- birthday_notified.json  
+- events.json  
+- events_notified.json  
+- calendar_state.json  
+- settings.json
 
 ---
 
@@ -108,12 +110,18 @@ Pet Reminder v9.0
 pet-reminder/
 │
 ├── pet.py
+├── calendar_widget.py
+├── event_window.py
+├── events_manager.py
+├── license.py
 ├── icon.ico
 ├── Icon.png
 ├── version.txt
+│
 ├── idle_clean/
 ├── click_clean/
-└── sleeping_clean/
+├── sleeping_clean/
+└── calendar_assets/
 ```
 
 ⚠️ Файлы `icon.ico` и `Icon.png` должны лежать рядом с `pet.py`.
@@ -129,7 +137,7 @@ cd pet-reminder
 
 ---
 
-### 2️⃣ Проверте Python (3.10+)
+### 2️⃣ Проверте Python (3.14+)
 
 ```bash
 python --version
@@ -164,9 +172,11 @@ python pet.py
 ## ❗ Важно
 
 - Запускать нужно **из корневой папки**, где лежит `pet.py`.
+- Все основные модули (`calendar_widget.py`, `event_window.py`, `events_manager.py`) должны находиться рядом с `pet.py`.
 - Файлы `icon.ico` и `Icon.png` должны находиться рядом с `pet.py`.
 - Папки `idle_clean`, `click_clean`, `sleeping_clean` должны быть в той же директории.
-- Если запустить из другой папки — иконка или анимации не загрузятся.
+- Папка `calendar_assets` (если используется) также должна лежать рядом с проектом.
+- Если запустить из другой папки — иконка, анимации или календарь могут не загрузиться.
 
 ---
 
@@ -179,6 +189,7 @@ pyinstaller --noconfirm --clean --onefile --windowed ^
 --add-data "idle_clean;idle_clean" ^
 --add-data "click_clean;click_clean" ^
 --add-data "sleeping_clean;sleeping_clean" ^
+--add-data "calendar_assets;calendar_assets" ^
 --add-data "Icon.png;." ^
 pet.py
 ```
@@ -193,7 +204,7 @@ pet.py
 - exe не подписан цифровой подписью
 
 <p align="center">
-<b>Version:</b> 9.0<br>
+<b>Version:</b> 10.0<br>
 <b>Status:</b> Stable Demo Build<br><br>
 Made with ❤️ in Python
 </p>
