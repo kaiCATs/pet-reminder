@@ -39,6 +39,11 @@ from event_window import EventWindow
 from events_manager import load_events, save_events
 
 # ===============================
+# 🐾 VERSION
+# ===============================
+APP_VERSION = "v10.0"
+
+# ===============================
 # ПУТИ ДЛЯ EXE (РЕСУРСЫ)
 # ===============================
 if getattr(sys, 'frozen', False):
@@ -400,6 +405,8 @@ class Pet(QLabel):
         icon_path = os.path.join(base_path, "icon.ico")
         if os.path.exists(icon_path):
             self.tray.setIcon(QIcon(icon_path))
+            self.tray.setToolTip("")
+            QTimer.singleShot(0, lambda: self.tray.setToolTip(f"Pet Reminder {APP_VERSION}"))
 
         self.tray_menu = QMenu()
 
@@ -410,9 +417,9 @@ class Pet(QLabel):
         nearest_action = QAction("🔔 Показать ближайший ДР", self)
         events_action = QAction("🗓 События", self)
 
-        version_action = QAction("Pet Reminder v9.0", self)
+        version_action = QAction(f"Версия: {APP_VERSION}", self)
         version_action.setEnabled(False)
-
+        
         exit_action = QAction("❌ Выход", self)
 
         # Добавляем пункты один раз

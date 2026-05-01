@@ -1,7 +1,12 @@
+# UTF-8
+#
+# For more details about fixed file info 'VERSIONINFO' see:
+# https://learn.microsoft.com/en-us/windows/win32/menurc/versioninfo-resource
+
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(9,0,0,0),
-    prodvers=(9,0,0,0),
+    filevers=(10, 0, 0, 0),
+    prodvers=(10, 0, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -13,19 +18,17 @@ VSVersionInfo(
     StringFileInfo(
       [
         StringTable(
-          '040904B0',
+          u'040904B0',
           [
-            StringStruct('CompanyName', 'Zefirka Apps'),
-            StringStruct('FileDescription', 'Pet Birthday Reminder'),
-            StringStruct('FileVersion', '9.0 release'),
-            StringStruct('InternalName', 'pet'),
-            StringStruct('OriginalFilename', 'pet.exe'),
-            StringStruct('ProductName', 'Pet Birthday'),
-            StringStruct('ProductVersion', '9.0 release')
+            StringStruct(u'CompanyName', u'PetReminder'),
+            StringStruct(u'FileDescription', u'Pet Reminder Desktop App'),
+            StringStruct(u'FileVersion', u'10.0'),
+            StringStruct(u'ProductVersion', u'10.0'),
+            StringStruct(u'ProductName', u'Pet Reminder')
           ]
         )
       ]
     ),
-    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]
 )

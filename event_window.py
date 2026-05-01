@@ -1,4 +1,7 @@
+import sys
 import os
+
+sys.path.append(os.path.dirname(__file__))
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QListWidget,
