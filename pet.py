@@ -1,22 +1,42 @@
 import sys
 import os
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import random
 import time
 import json
 from datetime import date
+from turtle import title
 
 from PyQt5.QtWidgets import (
-    QApplication, QLabel, QMessageBox,
-    QMenu, QWidget, QVBoxLayout,
-    QTableWidget, QTableWidgetItem,
+    QApplication, QWidget,
+    QHBoxLayout, QVBoxLayout,
+    QLabel, QMessageBox,
+    QMenu, QTableWidget, QTableWidgetItem,
     QPushButton,
     QDateEdit, QTimeEdit,
-    QSystemTrayIcon, QAction
+    QSystemTrayIcon, QAction,
+    QCalendarWidget,
+    QInputDialog,
+    QDialog,
+    QProxyStyle, QStyle
 )
 
-from PyQt5.QtCore import Qt, QTimer, QPoint, QDate, QTime
-from PyQt5.QtGui import QPixmap, QIcon  # === ДОБАВЛЕНО TRAY ===
+from PyQt5.QtCore import (
+    Qt, QTimer, QPoint,
+    QDate, QTime, QRect
+)
 
+from PyQt5.QtGui import (
+    QPainter, QPen, QColor,
+    QPixmap, QIcon,
+    QTextCharFormat, QBrush
+)
+
+# 👇 ВОТ СЮДА ДОБАВЛЯЕШЬ
+from calendar_widget import CustomCalendar
+from event_window import EventWindow
+from events_manager import load_events, save_events
 
 # ===============================
 # ПУТИ ДЛЯ EXE (РЕСУРСЫ)
@@ -92,17 +112,6 @@ def save_last_check(data):
 # ===============================
 # СОБЫТИЯ (ОТДЕЛЬНО ОТ ДР)
 # ===============================
-
-def load_events():
-    try:
-        with open(os.path.join(app_dir, "events.json"), "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return []
-
-def save_events(data):
-    with open(os.path.join(app_dir, "events.json"), "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
 
 def load_events_last_check():
     try:
@@ -271,203 +280,6 @@ class BirthdayWindow(QWidget):
         self.load_data()
 
         # 🔥 Мягкое подтверждение
-        self.btn_save.setText("✔ Сохранено")
-        self.btn_save.setEnabled(False)
-
-        QTimer.singleShot(1500, self.restore_save_button)
-
-    def restore_save_button(self):
-        self.btn_save.setText("Сохранить")
-        self.btn_save.setEnabled(True)
-
-    # ===============================
-    # ПЕРЕТАСКИВАНИЕ ОКНА
-    # ===============================
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
-            self.dragging = True
-            event.accept()
-
-    def mouseMoveEvent(self, event):
-        if getattr(self, "dragging", False) and event.buttons() == Qt.LeftButton:
-            self.move(event.globalPos() - self.drag_position)
-            event.accept()
-
-    def mouseReleaseEvent(self, event):
-        self.dragging = False
-
-# ===============================
-# ОКНО СОБЫТИЙ
-# ===============================
-class EventWindow(QWidget):
-    def __init__(self):
-        super().__init__(None)
-
-        self.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.Window |
-            Qt.WindowStaysOnTopHint
-        )
-
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setAttribute(Qt.WA_DeleteOnClose, True)
-
-        self.setFixedSize(500, 620)
-
-        self.container = QWidget(self)
-        self.container.setGeometry(0, 0, 500, 620)
-        self.container.setObjectName("container")
-
-        layout = QVBoxLayout(self.container)
-        layout.setSpacing(15)
-        layout.setContentsMargins(25, 25, 25, 25)
-
-        self.btn_close = QPushButton("✕")
-        self.btn_close.setFixedSize(40, 40)
-        self.btn_close.clicked.connect(self.close)
-        layout.addWidget(self.btn_close, alignment=Qt.AlignRight)
-
-        self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(
-            ["Название", "Дата", "Время", "Напомнить (дней)"]
-        )
-        self.table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.table)
-
-        self.btn_add = QPushButton("Добавить")
-        self.btn_remove = QPushButton("Удалить")
-        self.btn_save = QPushButton("Сохранить")
-
-        layout.addWidget(self.btn_add)
-        layout.addWidget(self.btn_remove)
-        layout.addWidget(self.btn_save)
-
-        self.btn_add.clicked.connect(self.add_row)
-        self.btn_remove.clicked.connect(self.remove_row)
-        self.btn_save.clicked.connect(self.save_data)
-
-        self.apply_style()
-        self.load_data()
-        self.show()
-
-    def apply_style(self):
-        self.setStyleSheet("""
-        QWidget#container {
-            background-color: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-        }
-        QTableWidget {
-            background-color: white;
-            border-radius: 10px;
-            font-size: 14px;
-        }
-        QPushButton {
-            background-color: #0078D7;
-            color: white;
-            border-radius: 10px;
-            padding: 6px 12px;
-        }
-        QPushButton:hover {
-            background-color: #005ea6;
-        }
-        """)
-
-    def load_data(self):
-        data = load_events()
-
-        today = date.today()
-
-        # 🔥 Сортировка по ближайшему событию
-        def days_until(e):
-            try:
-                event_date = date(e["year"], e["month"], e["day"])
-                return (event_date - today).days if event_date >= today else 9999
-            except:
-                return 9999
-
-        data.sort(key=days_until)
-
-        self.table.setRowCount(len(data))
-
-        for row, e in enumerate(data):
-
-            self.table.setItem(row, 0, QTableWidgetItem(e["title"]))
-
-            date_edit = QDateEdit()
-            date_edit.setCalendarPopup(True)
-            date_edit.setDate(QDate(e["year"], e["month"], e["day"]))
-            self.table.setCellWidget(row, 1, date_edit)
-
-            time_edit = QTimeEdit()
-            time_edit.setDisplayFormat("HH:mm")
-            time_edit.setTime(QTime(e.get("hour", 0), e.get("minute", 0)))
-            self.table.setCellWidget(row, 2, time_edit)
-
-            remind_item = QTableWidgetItem(str(e.get("remind_before", 0)))
-            self.table.setItem(row, 3, remind_item)
-
-    def add_row(self):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
-
-        # Дата
-        date_edit = QDateEdit()
-        date_edit.setCalendarPopup(True)
-        date_edit.setDate(QDate.currentDate())
-        self.table.setCellWidget(row, 1, date_edit)
-
-        # Время
-        time_edit = QTimeEdit()
-        time_edit.setDisplayFormat("HH:mm")
-        time_edit.setTime(QTime.currentTime())
-        self.table.setCellWidget(row, 2, time_edit)
-
-        # Напоминание
-        self.table.setItem(row, 3, QTableWidgetItem("0"))
-
-    def remove_row(self):
-        row = self.table.currentRow()
-        if row >= 0:
-            self.table.removeRow(row)
-
-    def save_data(self):
-        data = []
-
-        for row in range(self.table.rowCount()):
-            title_item = self.table.item(row, 0)
-            remind_item = self.table.item(row, 3)
-
-            if not title_item:
-                continue
-
-            title = title_item.text()
-            remind_before = int(remind_item.text()) if remind_item else 0
-
-            date_edit = self.table.cellWidget(row, 1)
-            qdate = date_edit.date()
-
-            time_edit = self.table.cellWidget(row, 2)
-            qtime = time_edit.time()
-
-            data.append({
-                "title": title,
-                "day": qdate.day(),
-                "month": qdate.month(),
-                "year": qdate.year(),
-                "hour": qtime.hour(),
-                "minute": qtime.minute(),
-                "remind_before": remind_before
-            })
-
-        save_events(data)
-
-        # пересортировка
-        self.load_data()
-
-        # мягкое подтверждение как у ДР
         self.btn_save.setText("✔ Сохранено")
         self.btn_save.setEnabled(False)
 
@@ -673,8 +485,6 @@ class Pet(QLabel):
 
         self.show()
     
-
-
     # ✅ Полное закрытие процесса
     def closeEvent(self, event):
         QApplication.quit()
@@ -684,13 +494,24 @@ class Pet(QLabel):
         frames = []
         folder_path = os.path.join(base_path, folder)
 
+        print("LOADING:", folder_path)
+
         if not os.path.exists(folder_path):
+            print("FOLDER NOT FOUND")
+            print("BASE:", base_path)
+            print("TRY LOAD:", folder_path)
+            print("EXISTS:", os.path.exists(folder_path))
             return frames
 
-        for file in sorted(os.listdir(folder_path)):
-            if file.endswith(".png"):
-                frames.append(QPixmap(os.path.join(folder_path, file)))
+        files = sorted(
+            [f for f in os.listdir(folder_path) if f.endswith(".png")]
+        )
 
+        for file in files:
+            path = os.path.join(folder_path, file)
+            frames.append(QPixmap(path))
+
+        print("FRAMES LOADED:", len(frames))
         return frames
 
     # дальше весь твой код БЕЗ ИЗМЕНЕНИЙ
@@ -883,8 +704,7 @@ class Pet(QLabel):
 
     def open_events_window(self):
         self.events_window = EventWindow()
-        self.events_window.show()       
-
+        self.events_window.show()
 
 # ===============================
 # ЗАПУСК
