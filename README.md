@@ -1,4 +1,7 @@
-<img width="608" height="608" alt="Icon" src="https://github.com/user-attachments/assets/2fdfd538-6929-488e-9473-27adb88cd825" />
+<div align="center">
+
+<img width="200" height="200" alt="Icon" src="https://github.com/user-attachments/assets/2fdfd538-6929-488e-9473-27adb88cd825" />
+
 # 🐾 Pet Reminder v10.1
 
 Desktop-питомец с системой умных напоминаний  
@@ -6,7 +9,7 @@ Desktop-питомец с системой умных напоминаний
 
 ![version](https://img.shields.io/badge/version-10.1-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
----
+</div>
 
 ## 🐶 О проекте
 
