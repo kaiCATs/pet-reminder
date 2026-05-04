@@ -2,7 +2,7 @@
 
 <img width="200" height="200" alt="Icon" src="https://github.com/user-attachments/assets/2fdfd538-6929-488e-9473-27adb88cd825" />
 
-# 🐾 Pet Reminder v10.1
+<h1 align="center">🐾 Pet Reminder v10.1</h1>
 
 Desktop-питомец с системой умных напоминаний  
 Лёгкий • Ненавязчивый • Всегда рядом
