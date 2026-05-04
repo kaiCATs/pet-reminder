@@ -1,3 +1,4 @@
+<img width="608" height="608" alt="Icon" src="https://github.com/user-attachments/assets/2fdfd538-6929-488e-9473-27adb88cd825" />
 # 🐾 Pet Reminder v10.1
 
 Desktop-питомец с системой умных напоминаний  
