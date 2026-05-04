@@ -1,9 +1,9 @@
-# 🐾 Pet Reminder v10.0
+# 🐾 Pet Reminder v10.1
 
 Desktop-питомец с системой умных напоминаний  
 Лёгкий • Ненавязчивый • Всегда рядом
 
-![version](https://img.shields.io/badge/version-10.0-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![version](https://img.shields.io/badge/version-10.1-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
 ---
 
@@ -68,7 +68,7 @@ Desktop-питомец с системой умных напоминаний
 🗓 События
 -----------------
 ⬜ Автозапуск выключен
-Версия v10.0
+Версия v10.1
 ❌ Выход
 ```
 
@@ -191,7 +191,7 @@ pet.py
 
 ## 📝 Changelog
 
-### v10.0 — текущая версия
+### v10.1 — текущая версия
 
 **Архитектура**
 - Выделен `birthday_manager.py` — вся логика ДР, тосты, склонения
@@ -220,7 +220,7 @@ pet.py
 
 ---
 
-**Version:** 10.0  
+**Version:** 10.1  
 **Status:** Stable  
 
 Made with ❤️ in Python
