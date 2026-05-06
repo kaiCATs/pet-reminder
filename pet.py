@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import random
 import time
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from PyQt5.QtWidgets import (
     QApplication,
@@ -22,20 +22,16 @@ from PyQt5.QtGui import QPixmap, QIcon, QTransform
 
 from event_window import EventWindow
 from events_manager import load_events
-from birthday_manager import (
-    BirthdayWindow,
-    ToastNotification,
-    load_birthdays,
-    load_last_check, save_last_check,
-    days_word, years_word,
-)
-from config import load_position, save_position
+from birthday_manager import ToastNotification, days_word
+from config import load_position, save_position, is_first_launch, has_pet_name, is_tutorial_done
+from tutorial import TutorialManager, NameReminderBubble, PetNameDialog
+from chat_window import ChatWindow
 
 
 # ================================================================
 # ВЕРСИЯ ПРИЛОЖЕНИЯ
 # ================================================================
-APP_VERSION = "v10.0"
+APP_VERSION = "v11.0"
 APP_NAME    = "PetReminder"  # ключ в реестре автозапуска
 
 
@@ -105,6 +101,7 @@ class Pet(QLabel):
 
         # Живые тосты — храним ссылки чтобы Qt не удалял раньше времени
         self._toasts = []
+        self._chat_window = None  # окно чата
 
         # Активные singleShot таймеры событий (для пересоздания при изменениях)
         self._event_timers = []
@@ -127,10 +124,10 @@ class Pet(QLabel):
 
         show_action      = QAction("🐾 Показать зверька", self)
         hide_action      = QAction("📥 Скрыть в трей", self)
-        birthdays_action = QAction("🎂 Дни рождения", self)
-        nearest_action   = QAction("🔔 Показать ближайший ДР", self)
         events_action    = QAction("🗓 События", self)
         self.autostart_action = QAction("", self)  # текст устанавливается ниже
+        tutorial_action  = QAction("❓ Туториал", self)
+        rename_action    = QAction("🏷️ Сменить имя питомца", self)
         version_action   = QAction(f"Версия: {APP_VERSION}", self)
         version_action.setEnabled(False)
         exit_action      = QAction("❌ Выход", self)
@@ -140,20 +137,20 @@ class Pet(QLabel):
         self.tray_menu.addAction(show_action)
         self.tray_menu.addAction(hide_action)
         self.tray_menu.addSeparator()
-        self.tray_menu.addAction(birthdays_action)
-        self.tray_menu.addAction(nearest_action)
         self.tray_menu.addAction(events_action)
         self.tray_menu.addSeparator()
         self.tray_menu.addAction(self.autostart_action)
+        self.tray_menu.addAction(tutorial_action)
+        self.tray_menu.addAction(rename_action)
         self.tray_menu.addAction(version_action)
         self.tray_menu.addAction(exit_action)
 
         show_action.triggered.connect(self.show)
         hide_action.triggered.connect(self.hide)
-        birthdays_action.triggered.connect(self.open_birthday_window)
         events_action.triggered.connect(self.open_events_window)
-        nearest_action.triggered.connect(self.check_birthdays)
         self.autostart_action.triggered.connect(self.toggle_autostart)
+        tutorial_action.triggered.connect(self.open_tutorial)
+        rename_action.triggered.connect(self.open_rename)
         exit_action.triggered.connect(QApplication.quit)
 
         self.tray.setContextMenu(self.tray_menu)
@@ -225,10 +222,19 @@ class Pet(QLabel):
         # --------------------------------------------------------
         # УВЕДОМЛЕНИЯ И СОБЫТИЯ
         # --------------------------------------------------------
-        self.check_birthdays()
         self.schedule_event_reminders()
 
         self.show()
+
+        # --------------------------------------------------------
+        # ТУТОРИАЛ И ИМЯ ПИТОМЦА
+        # --------------------------------------------------------
+        # Первый запуск — показываем туториал
+        if is_first_launch() and not is_tutorial_done():
+            QTimer.singleShot(500, self._start_tutorial)
+        # Туториал уже был, но имя не задано — напоминаем через 10 минут
+        elif not has_pet_name():
+            QTimer.singleShot(600000, self._remind_name)
 
     def closeEvent(self, event):
         """При закрытии окна — завершаем процесс (позиция сохраняется через aboutToQuit)."""
@@ -387,58 +393,14 @@ class Pet(QLabel):
             self.update_direction()
 
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.RightButton:
+            self._toggle_chat()
+            return
         if not self.moved:
             self.start_click_animation()
         self.dragging = False
 
-    # ----------------------------------------------------------------
-    # ДНИ РОЖДЕНИЯ
-    # ----------------------------------------------------------------
-    def check_birthdays(self):
-        """
-        Проверяет ДР и показывает тост если осталось 3 или 7 дней.
-        При запуске — только первый раз за день.
-        Из трея — всегда.
-        """
-        today     = date.today()
-        today_str = today.strftime("%Y-%m-%d")
 
-        last_check      = load_last_check()
-        already_checked = last_check.get("date") == today_str
-
-        birthdays = load_birthdays()
-        messages  = []
-
-        for b in birthdays:
-            try:
-                next_birthday = date(today.year, int(b["month"]), int(b["day"]))
-                if next_birthday < today:
-                    next_birthday = date(today.year + 1, int(b["month"]), int(b["day"]))
-
-                days_left = (next_birthday - today).days
-
-                if days_left in (3, 7):
-                    age = next_birthday.year - int(b["year"])
-                    messages.append(
-                        f"📅 {b['name']}\n"
-                        f"Через {days_left} {days_word(days_left)}\n"
-                        f"Исполнится {age} {years_word(age)}"
-                    )
-
-            except Exception as e:
-                print(f"[Pet] check_birthdays: {e}")
-                continue
-
-        if messages:
-            toast = ToastNotification(
-                "\n\n".join(messages),
-                color="rgba(40, 40, 40, 230)",
-                offset_y=20
-            )
-            self._toasts.append(toast)
-
-        if not already_checked:
-            save_last_check({"date": today_str})
 
     # ----------------------------------------------------------------
     # СОБЫТИЯ — таймеры напоминаний
@@ -598,10 +560,29 @@ class Pet(QLabel):
     # ----------------------------------------------------------------
     # ОТКРЫТИЕ ОКОН
     # ----------------------------------------------------------------
-    def open_birthday_window(self):
-        """Открывает окно управления днями рождения."""
-        self.birthday_window = BirthdayWindow()
-        self.birthday_window.show()
+    def _toggle_chat(self):
+        """Открывает или закрывает окно чата по ПКМ на питомце."""
+        if self._chat_window and self._chat_window.isVisible():
+            self._chat_window._on_close()
+            self._chat_window = None
+        else:
+            self._chat_window = ChatWindow(
+                    on_events_changed=self.schedule_event_reminders
+                )
+            # Позиционируем рядом с питомцем
+            pet_x = self.pos().x()
+            pet_y = self.pos().y()
+            screen = self.screen_rect()
+            chat_w = self._chat_window.width()
+            chat_h = self._chat_window.height()
+            # Слева или справа от питомца
+            if pet_x + self.width() + chat_w + 10 < screen.right():
+                x = pet_x + self.width() + 10
+            else:
+                x = pet_x - chat_w - 10
+            y = max(screen.top(), min(pet_y, screen.bottom() - chat_h))
+            self._chat_window.move(x, y)
+            self._chat_window.show()
 
     def open_events_window(self):
         """
@@ -612,6 +593,45 @@ class Pet(QLabel):
             on_events_changed=self.schedule_event_reminders
         )
         self.events_window.show()
+
+    # ----------------------------------------------------------------
+    # ТУТОРИАЛ
+    # ----------------------------------------------------------------
+    def _start_tutorial(self):
+        """Запускает туториал при первом запуске."""
+        self._tutorial = TutorialManager(on_finished=self._on_tutorial_finished)
+        self._tutorial.start()
+
+    def _on_tutorial_finished(self):
+        """Вызывается после завершения или пропуска туториала."""
+        # Если имя всё равно не задано — напомним через 10 минут
+        if not has_pet_name():
+            QTimer.singleShot(600000, self._remind_name)
+
+    def open_tutorial(self):
+        """
+        Открывает туториал из трей-меню.
+        skip_name=True — окно имени не показываем если имя уже задано.
+        """
+        self._tutorial = TutorialManager(skip_name=True)
+        self._tutorial.start()
+
+    def open_rename(self):
+        """
+        Открывает окно смены имени питомца.
+        Новое имя перезапишет старое. Окно можно закрыть —
+        старое имя при этом останется.
+        """
+        self._rename_dialog = PetNameDialog(on_name_saved=lambda name: None)
+        # Разрешаем закрытие — это не первый запуск, имя уже есть
+        self._rename_dialog.closeEvent = lambda event: event.accept()
+
+    def _remind_name(self):
+        """Показывает напоминание о том что питомцу не дали имя."""
+        if not has_pet_name():
+            self._name_bubble = NameReminderBubble(
+                on_name_now=lambda name: None  # просто сохраняем
+            )
 
 
 # ================================================================

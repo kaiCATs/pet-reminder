@@ -14,6 +14,7 @@ from PyQt5.QtCore import Qt, QDate, QTime
 
 from calendar_widget import CustomCalendar
 from events_manager import load_events, save_events
+from assistant import load_event_window_theme, save_event_window_theme
 
 
 # ================================================================
@@ -231,6 +232,10 @@ class EventWindow(QWidget):
         # Колбэк для обновления таймеров в Pet после изменений
         self.on_events_changed = on_events_changed
 
+        # Тема: "light" или "dark" — применяется к рамке/фону окна,
+        # сам календарь остаётся светлым (чтоб не ломать его внутреннюю отрисовку)
+        self._theme = load_event_window_theme()
+
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.resize(900, 600)
@@ -245,27 +250,47 @@ class EventWindow(QWidget):
         main_layout = QVBoxLayout(self.container)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
+        # Верхняя панель: переключатель темы + кнопка закрытия
+        top_row = QHBoxLayout()
+        top_row.addStretch()
+
+        self.theme_btn = QPushButton("🌙" if self._theme == "light" else "☀️")
+        self.theme_btn.setObjectName("themeBtn")
+        self.theme_btn.setFixedSize(36, 36)
+        self.theme_btn.setToolTip("Переключить тему окна событий")
+        self.theme_btn.clicked.connect(self._toggle_theme)
+        top_row.addWidget(self.theme_btn)
+
         # Кнопка закрытия
         self.close_btn = QPushButton("✕")
+        self.close_btn.setObjectName("closeBtn")
         self.close_btn.setFixedSize(45, 45)
         self.close_btn.clicked.connect(self.close)
-        main_layout.addWidget(self.close_btn, alignment=Qt.AlignRight)
+        top_row.addWidget(self.close_btn)
+
+        main_layout.addLayout(top_row)
 
         # Основной лейаут
         content = QHBoxLayout()
         main_layout.addLayout(content)
 
-        # Календарь (левая панель)
+        # Календарь (левая панель) — заворачиваем в рамку чтоб тёмная тема
+        # обрамляла его, не залезая внутрь
+        cal_frame = QFrame()
+        cal_frame.setObjectName("calFrame")
+        cal_layout = QVBoxLayout(cal_frame)
+        cal_layout.setContentsMargins(8, 8, 8, 8)
         self.calendar = CustomCalendar(self.events)
         self.calendar.setMinimumWidth(500)
         self.calendar.clicked.connect(self.refresh_events)
-        content.addWidget(self.calendar)
+        cal_layout.addWidget(self.calendar)
+        content.addWidget(cal_frame)
 
         # Правая панель
         right_layout = QVBoxLayout()
 
         self.title = QLabel("События")
-        self.title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        self.title.setObjectName("eventsTitle")
         right_layout.addWidget(self.title)
 
         self.events_list = QListWidget()
@@ -277,10 +302,10 @@ class EventWindow(QWidget):
         right_layout.addWidget(self.events_list)
 
         # Подсказка про редактирование
-        hint = QLabel("Двойной клик — редактировать  |  ПКМ — удалить")
-        hint.setStyleSheet("font-size: 11px; color: #888;")
-        hint.setAlignment(Qt.AlignCenter)
-        right_layout.addWidget(hint)
+        self.hint = QLabel("Двойной клик — редактировать  |  ПКМ — удалить")
+        self.hint.setObjectName("hintLabel")
+        self.hint.setAlignment(Qt.AlignCenter)
+        right_layout.addWidget(self.hint)
 
         self.add_btn = QPushButton("Добавить событие")
         self.add_btn.clicked.connect(self.add_event)
@@ -291,40 +316,114 @@ class EventWindow(QWidget):
         self.apply_style()
         self.refresh_events()
 
+    def _toggle_theme(self):
+        """Переключает тему окна событий."""
+        self._theme = "dark" if self._theme == "light" else "light"
+        save_event_window_theme(self._theme)
+        self.theme_btn.setText("🌙" if self._theme == "light" else "☀️")
+        self.apply_style()
+
     def apply_style(self):
-        self.setStyleSheet("""
-        QFrame#container {
-            background-color: rgba(255, 255, 255, 0.85);
+        if self._theme == "dark":
+            container_bg = "rgba(34, 34, 38, 0.95)"      # тёмное обрамление
+            cal_frame_bg = "rgba(255, 255, 255, 0.96)"   # белая подложка для календаря
+            list_bg      = "#2b2b30"
+            list_color   = "#e0e0e0"
+            list_alt     = "#33333a"
+            title_color  = "#f0f0f0"
+            hint_color   = "#9a9a9a"
+            btn_bg       = "#3a8fff"
+            btn_hover    = "#1f6fdc"
+            btn_text     = "white"
+            top_btn_bg   = "rgba(255,255,255,0.10)"
+            top_btn_hover= "rgba(255,255,255,0.18)"
+            top_btn_color= "#f0f0f0"
+        else:
+            container_bg = "rgba(255, 255, 255, 0.85)"
+            cal_frame_bg = "rgba(255, 255, 255, 0.95)"
+            list_bg      = "white"
+            list_color   = "#222"
+            list_alt     = "#f7f7f7"
+            title_color  = "#222"
+            hint_color   = "#888"
+            btn_bg       = "#0078D7"
+            btn_hover    = "#005ea6"
+            btn_text     = "white"
+            top_btn_bg   = "rgba(0,0,0,0.05)"
+            top_btn_hover= "rgba(0,0,0,0.10)"
+            top_btn_color= "#222"
+
+        self.setStyleSheet(f"""
+        QFrame#container {{
+            background-color: {container_bg};
             border-radius: 20px;
-        }
-        QCalendarWidget {
-            background-color: transparent;
+        }}
+        QFrame#calFrame {{
+            background-color: {cal_frame_bg};
+            border-radius: 14px;
+        }}
+        /* Сам календарь оставляем со светлой палитрой —
+           кастомизация QCalendarWidget изнутри ломает отрисовку ячеек */
+        QCalendarWidget {{
+            background-color: white;
             font-size: 16px;
-        }
-        QCalendarWidget QToolButton {
+            color: #222;
+        }}
+        QCalendarWidget QToolButton {{
             font-size: 18px;
             height: 40px;
-        }
-        QCalendarWidget QMenu {
+            color: #222;
+            background-color: transparent;
+        }}
+        QCalendarWidget QMenu {{
             font-size: 14px;
-        }
-        QCalendarWidget QWidget#qt_calendar_navigationbar {
-            min-height: 45px;
-        }
-        QListWidget {
+            color: #222;
             background-color: white;
+        }}
+        QCalendarWidget QWidget#qt_calendar_navigationbar {{
+            min-height: 45px;
+            background-color: #f0f0f0;
+        }}
+        QListWidget {{
+            background-color: {list_bg};
+            color: {list_color};
             border-radius: 10px;
             font-size: 15px;
-        }
-        QPushButton {
-            background-color: #0078D7;
+            alternate-background-color: {list_alt};
+            border: none;
+            padding: 4px;
+        }}
+        QListWidget::item:selected {{
+            background-color: {btn_bg};
             color: white;
+        }}
+        QLabel#eventsTitle {{
+            font-size: 20px;
+            font-weight: bold;
+            color: {title_color};
+        }}
+        QLabel#hintLabel {{
+            font-size: 11px;
+            color: {hint_color};
+        }}
+        QPushButton {{
+            background-color: {btn_bg};
+            color: {btn_text};
             border-radius: 10px;
             padding: 8px;
-        }
-        QPushButton:hover {
-            background-color: #005ea6;
-        }
+        }}
+        QPushButton:hover {{
+            background-color: {btn_hover};
+        }}
+        QPushButton#themeBtn, QPushButton#closeBtn {{
+            background-color: {top_btn_bg};
+            color: {top_btn_color};
+            border-radius: 10px;
+            font-size: 16px;
+        }}
+        QPushButton#themeBtn:hover, QPushButton#closeBtn:hover {{
+            background-color: {top_btn_hover};
+        }}
         """)
 
     def refresh_events(self):
@@ -351,16 +450,27 @@ class EventWindow(QWidget):
 
             # Значок напоминания
             remind = int(e.get("remind_before_minutes", 0))
-            if remind > 0:
+            if remind == 0:
+                remind_str = "  🔔 в момент"
+            elif remind < 60:
+                remind_str = f"  🔔 за {remind} мин"
+            elif remind < 24 * 60:
                 h, m = divmod(remind, 60)
-                if h > 0 and m > 0:
+                if m > 0:
                     remind_str = f"  🔔 за {h}ч {m}мин"
-                elif h > 0:
-                    remind_str = f"  🔔 за {h}ч"
                 else:
-                    remind_str = f"  🔔 за {m}мин"
+                    remind_str = f"  🔔 за {h} ч"
             else:
-                remind_str = ""
+                d, rest = divmod(remind, 24 * 60)
+                if rest > 0:
+                    h = rest // 60
+                    remind_str = f"  🔔 за {d} дн {h} ч"
+                elif d == 1:
+                    remind_str = "  🔔 за день"
+                elif d == 7:
+                    remind_str = "  🔔 за неделю"
+                else:
+                    remind_str = f"  🔔 за {d} дн"
 
             item = QListWidgetItem(f"{time_str}  |  {e['title']}{remind_str}{repeat_str}")
             item.setData(Qt.UserRole, e)
