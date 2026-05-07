@@ -1,240 +1,107 @@
-<div align="center">
+<h1 align="center"><img src="Icon.png" width="200"></h1>
 
-<img width="200" height="200" alt="Icon" src="https://github.com/user-attachments/assets/2fdfd538-6929-488e-9473-27adb88cd825" />
+<h1 align="center">🐾 Pet Reminder v10.2 🐾 </h1>
 
-<h1 align="center">🐾 Pet Reminder v10.2</h1>
+<p align="center">
+Desktop pet with a smart reminder system 
+Lightweight • Unobtrusive • Always by your side 
+</p>
 
-Desktop-питомец с системой умных напоминаний  
-Лёгкий • Ненавязчивый • Всегда рядом
+<p align="center">
+  <img src="https://img.shields.io/badge/version-10.2-blue">
+  <img src="https://img.shields.io/badge/python-3.14+-yellow">
+  <img src="https://img.shields.io/badge/platform-Windows-lightgrey">
+  <img src="https://img.shields.io/badge/status-stable-brightgreen">
+</p>
+---
 
-![version](https://img.shields.io/badge/version-10.2-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+## About
 
-</div>
-
-## 🐶 О проекте
-
-**Pet Reminder** — это desktop-приложение с анимированным питомцем,
-который живёт на рабочем столе и напоминает о важных датах.
-
-Приложение работает в системном трее и сохраняет данные локально в `%APPDATA%`.
+**Pet Reminder** is a desktop app with an animated pet that lives on your desktop and reminds you of important dates. Runs in the system tray, stores all data locally in `%APPDATA%\PetReminder`.
 
 ---
 
-## ✨ Возможности
+## Features
 
-### 🐾 Анимированный питомец
+**🐾 Pet** — idle / click / sleep animations, draggable, stays on screen, remembers position, always on top.
 
-- Idle, Click, Sleep анимации
-- Перетаскивание по экрану
-- Не выходит за границы рабочего стола
-- Зеркалирование спрайта: левая половина экрана — смотрит влево, правая — вправо
-- Запоминает позицию между запусками
-- Поверх всех окон, работает через системный трей
+**💬 Chat** — right-click the pet to open a text assistant. Add events and birthdays by typing, check what's upcoming, search history.
 
-### 💬 Чат-помощник
+**🗓 Events** — name, date, time, custom remind offset, recurring (daily / weekly / monthly / yearly). Edit with double-click, delete with right-click.
 
-- Добавление событий и дней рождения через естественный язык
-- Диалог с кнопками-подсказками: повтор, время, пол, период напоминания
-- Понимание сокращений, числовых и буквенных форм времени суток
-- Редактирование событий через чат: дата, время, название, повтор
-- Удаление событий и ДР через чат с нечётким поиском по названию
-- Определение пола по имени; переспрашивает при двуполых именах (Саша, Женя)
-- Правильное склонение имён в дательный и родительный падежи
+**🔔 Notifications** — toast popups (bottom-right), dark for birthdays, blue for events, auto-dismiss after 6 s.
 
-### 🎂 Дни рождения
+**🎓 Tutorial** — shown on first launch, reopenable from tray. Includes pet naming with profanity filter.
 
-- Добавление и удаление через чат или GUI
-- Настраиваемое напоминание: время + за сколько до даты + повтор
-- Автоматический подсчёт возраста и правильное склонение (год / года / лет)
-- Понимание возраста на входе: «28», «28 лет», «1990» — все варианты
-- Защита от повторных уведомлений в течение дня
-
-### 🗓 События
-
-- Название, дата и время; настраиваемое напоминание (в момент / за N мин / за день)
-- Повторяющиеся события: каждый день / неделю / месяц / год
-- Редактирование двойным кликом в GUI или командой «измени» в чате
-- Удаление через ПКМ в GUI или командой «удали» в чате
-- Показ ближайших событий с датой (без «через N дней»)
-
-### 🔔 Уведомления
-
-- Toast-окна в правом нижнем углу с плавной анимацией
-- Раздельный стиль для ДР (тёмный) и событий (синий)
-- Автоматическое закрытие через 6 секунд
-
-### 🌙 Темы оформления
-
-- Переключение тёмной/светлой темы в окне событий (кнопка 🌙/☀️)
-- Сам виджет календаря сохраняет светлую палитру (без артефактов отрисовки)
-- Выбор темы сохраняется между запусками
-
-### ⚙️ Прочее
-
-- Автозапуск с Windows через реестр (включается из трей-меню)
-- Все данные хранятся локально в `%APPDATA%\PetReminder`
+**⚙️ Other** — Windows autostart via registry, rename pet anytime, language switch (RU / EN) — all from the tray menu.
 
 ---
 
-## 🖥 Tray-меню
+## Quick Start
 
-```
-🐾 Показать зверька
-📥 Скрыть в трей
------------------
-🎂 Дни рождения
-🔔 Показать ближайший ДР
-🗓 События
------------------
-⬜ Автозапуск выключен
-Версия v10.2
-❌ Выход
+```bash
+git clone https://github.com/kaiCATs/pet-reminder.git
+cd pet-reminder
+pip install PyQt5
+python pet.py
 ```
 
----
-
-## 💾 Хранение данных
-
-Данные сохраняются в:
-
-```
-%APPDATA%/PetReminder
-```
-
-Файлы:
-
-- `events.json` — список событий и дней рождения
-- `birthday_notified.json` — кеш уведомлений о ДР
-- `events_notified.json` — кеш уведомлений о событиях
-- `position.json` — последняя позиция питомца на экране
-- `chat_settings.json` — настройки чата (шрифт, размер окна, тема)
+> Python 3.14+ required. Run from the project root folder.
 
 ---
 
-## 🛠 Технологии
-
-- Python 3.14+
-- PyQt5
-- JSON
-- winreg
-- PyInstaller
-
----
-
-## 🚀 Запуск из исходников
-
-Проект запускается напрямую из файла `pet.py`.
-
-### 📁 Структура проекта
+## Project Structure
 
 ```
 pet-reminder/
-│
-├── pet.py
-├── assistant.py
-├── chat_window.py
-├── birthday_manager.py
+├── pet.py              # entry point
+├── animation.py        # frame loading & animation state
+├── tray.py             # system tray & menu
+├── reminders.py        # event reminder timers
+├── autostart.py        # Windows registry autostart
+├── locale.py           # RU / EN strings
+├── storage.py          # single app_state.json (replaces 9 small files)
+├── assistant.py        # chat logic
+├── chat_window.py      # chat UI
+├── event_window.py     # events UI
 ├── calendar_widget.py
-├── event_window.py
-├── events_manager.py
+├── birthday_manager.py
 ├── tutorial.py
 ├── config.py
 ├── icon.ico
 ├── Icon.png
 ├── version.txt
-│
 ├── idle_clean/
 ├── click_clean/
 └── sleeping_clean/
 ```
 
-⚠️ Файлы `icon.ico` и `Icon.png` должны лежать рядом с `pet.py`.
+---
+
+## Data
+
+All state is stored in one file: `%APPDATA%\PetReminder\app_state.json`  
+Events live in `events.json`, chat history in `chat_history.json`.
 
 ---
 
-### 1️⃣ Склонируйте репозиторий
+## Build
 
-```
-git clone https://github.com/kaiCATs/pet-reminder.git
-cd pet-reminder
-```
-
-### 2️⃣ Проверьте Python (3.14+)
-
-```
-python --version
-```
-
-Если Python не установлен — скачайте с https://www.python.org/
-
-### 3️⃣ Установите зависимость
-
-```
-pip install PyQt5
+```bash
+pyinstaller --noconfirm --clean --onefile --windowed ^
+  --icon=icon.ico --version-file=version.txt ^
+  --add-data "idle_clean;idle_clean" ^
+  --add-data "click_clean;click_clean" ^
+  --add-data "sleeping_clean;sleeping_clean" ^
+  --add-data "Icon.png;." ^
+  pet.py
 ```
 
-Если `pip` не срабатывает:
-
-```
-python -m pip install PyQt5
-```
-
-### 4️⃣ Запустите приложение
-
-```
-python pet.py
-```
+> Autostart only works in the compiled `.exe`.
 
 ---
 
-## ❗ Важно
+<div align="center">
 
-- Запускать нужно **из корневой папки**, где лежит `pet.py`
-- Все модули должны лежать рядом с `pet.py`
-- Папки `idle_clean`, `click_clean`, `sleeping_clean` должны быть в той же директории
-- Автозапуск корректно работает только в собранном `.exe`
-
----
-
-## 📦 Сборка в exe
-
-```
-pip install pyinstaller PyQt5 -q; pyinstaller --noconfirm --clean --onefile --windowed --icon=icon.ico --version-file=version.txt --add-data 'icon.ico;.' --add-data 'Icon.png;.' --add-data 'idle_clean;idle_clean' --add-data 'click_clean;click_clean' --add-data 'sleeping_clean;sleeping_clean' --hidden-import=PyQt5 --hidden-import=PyQt5.sip --hidden-import=winreg --name=pet pet.py
-
-```
-
----
-
-### v10.1
-
-**Архитектура**
-- Выделен `birthday_manager.py` — вся логика ДР, тосты, склонения
-- Выделен `config.py` — общие пути и сохранение позиции питомца
-- Убраны все неиспользуемые импорты
-
-**Питомец**
-- Питомец не выходит за границы рабочего стола
-- Зеркалирование спрайта в зависимости от половины экрана
-- Позиция сохраняется при выходе и восстанавливается при запуске
-- Автозапуск с Windows через реестр (переключается из трей-меню)
-
-**Уведомления**
-- Toast-уведомления объединены в один класс с параметрами цвета и отступа
-- Плавная анимация появления и исчезновения тоста
-
-**События**
-- Настраиваемое напоминание: за N часов и минут (вместо фиксированных дней)
-- Повторяющиеся события: каждый день / неделю / месяц / год
-- Редактирование события двойным кликом
-- Таймеры пересоздаются сразу после добавления или изменения события
-- Диалог события с закруглёнными углами и поддержкой перетаскивания
-
-**Дни рождения**
-- Функции проверки ДР объединены в одну
-
----
-
-<div align="center">**Version:** 10.2  
-<div align="center">**Status:** Stable  
-
-<div align="center">Made with ❤️ in Python
+**Version:** 10.2 · **Status:** Stable  
+Made with ❤️ in Python
