@@ -207,7 +207,6 @@ class TutorialWindow(QWidget):
         self._slide_area = QFrame()
         self._slide_area.setFixedSize(352, 210)
         self._slide_area.setStyleSheet("background: transparent;")
-        self._slide_area.setClipChildren(True)
         outer.addWidget(self._slide_area)
 
         # Pages
