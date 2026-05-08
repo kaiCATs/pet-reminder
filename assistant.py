@@ -6,109 +6,49 @@ import json
 import re
 from datetime import datetime, date, timedelta
 
-from config import app_dir, load_pet_name
+import storage
+from storage import load_pet_name
 from events_manager import load_events, save_events
 from birthday_manager import days_word, years_word
 
 
 # ================================================================
-# ФАЙЛЫ ДАННЫХ
-# ================================================================
-_history_file  = os.path.join(app_dir, "chat_history.json")
-_memory_file   = os.path.join(app_dir, "chat_memory.json")
-_slang_file    = os.path.join(app_dir, "user_slang.json")
-_settings_file = os.path.join(app_dir, "chat_settings.json")
-_prompt_file   = os.path.join(app_dir, "user_prompt.json")
-
-
-# ================================================================
-# НАСТРОЙКИ ОКНА ЧАТА
+# ОБЁРТКИ НАД storage — для совместимости с остальным кодом
 # ================================================================
 def load_chat_settings():
-    try:
-        with open(_settings_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {"font_size": "medium", "window_width": 380, "window_height": 500}
-
+    return storage.load_chat_settings()
 
 def save_chat_settings(data):
-    try:
-        with open(_settings_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"[assistant] save_chat_settings: {e}")
+    storage.save_chat_settings(data)
 
-
-# ================================================================
-# ТЕМА ОКНА СОБЫТИЙ ("light" | "dark")
-# ================================================================
 def load_event_window_theme():
-    """Возвращает 'light' или 'dark'. Дефолт — 'light'."""
-    try:
-        s = load_chat_settings()
-        t = s.get("event_window_theme", "light")
-        return t if t in ("light", "dark") else "light"
-    except Exception:
-        return "light"
-
+    return storage.load_event_window_theme()
 
 def save_event_window_theme(theme):
-    """Сохраняет тему окна событий."""
-    try:
-        s = load_chat_settings()
-        s["event_window_theme"] = "dark" if theme == "dark" else "light"
-        save_chat_settings(s)
-    except Exception as e:
-        print(f"[assistant] save_event_window_theme: {e}")
+    storage.save_event_window_theme(theme)
 
-
-# ================================================================
-# НАСТРОЙКИ ПОМОЩНИКА
-# ================================================================
 def load_user_prompt():
-    try:
-        with open(_prompt_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {
-            "tone": "дружеский",
-            "about_user": "",
-            "instructions": "",
-            "ask_if_unsure": True,
-        }
-
+    return storage.load_user_prompt()
 
 def save_user_prompt(data):
-    try:
-        with open(_prompt_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"[assistant] save_user_prompt: {e}")
+    storage.save_user_prompt(data)
 
-
-# ================================================================
-# ИСТОРИЯ ЧАТА
-# ================================================================
 def load_history():
     try:
-        with open(_history_file, "r", encoding="utf-8") as f:
+        with open(storage.HISTORY_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return []
 
-
 def save_history(history):
     try:
-        with open(_history_file, "w", encoding="utf-8") as f:
+        with open(storage.HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(history, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"[assistant] save_history: {e}")
 
-
 def clear_history():
     save_history([])
-
 
 def add_to_history(role, text):
     history = load_history()
@@ -118,7 +58,6 @@ def add_to_history(role, text):
         "time": datetime.now().strftime("%d.%m.%Y %H:%M"),
     })
     save_history(history)
-
 
 def search_history(query, period_days=None):
     history = load_history()
@@ -146,8 +85,6 @@ BASE_SLANG = {
     "дня рождения": "день рождения",
     "дни рождения": "день рождения",
     "нап":  "напомни",
-    # Однобуквенные ("с", "з", "ч", "в") НЕ включаем —
-    # они конфликтуют с предлогами и буквами в составе слов.
     "сег":  "сегодня",
     "зав":  "завтра",
     "пн":   "понедельник",
@@ -158,37 +95,18 @@ BASE_SLANG = {
     "сб":   "суббота",
     "вс":   "воскресенье",
     "мин":  "минут",
-    # "час" → "часов" УБРАНО: ломает "в час дня" → "в часов дня" → parse_time не понимает
     "спс":  "спасибо",
     "пж":   "пожалуйста",
     "ок":   "хорошо",
     "ok":   "хорошо",
 }
 
-
 def load_slang():
-    user_slang = {}
-    try:
-        with open(_slang_file, "r", encoding="utf-8") as f:
-            user_slang = json.load(f)
-    except Exception:
-        pass
+    user_slang = storage.load_slang()
     return {**BASE_SLANG, **user_slang}
 
-
 def save_user_slang(word, meaning):
-    try:
-        user_slang = {}
-        try:
-            with open(_slang_file, "r", encoding="utf-8") as f:
-                user_slang = json.load(f)
-        except Exception:
-            pass
-        user_slang[word.lower()] = meaning
-        with open(_slang_file, "w", encoding="utf-8") as f:
-            json.dump(user_slang, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"[assistant] save_user_slang: {e}")
+    storage.save_user_slang(word, meaning)
 
 
 def expand_slang(text):
@@ -618,21 +536,31 @@ _state = DialogState()
 # ================================================================
 # ФОРМАТИРОВАНИЕ ОТВЕТОВ
 # ================================================================
+def _r(ru: str, en: str) -> str:
+    """Return ru or en string depending on current language setting."""
+    return en if storage.current_language() == "en" else ru
+
+
 def _fmt_date(d):
-    months = [
+    if storage.current_language() == "en":
+        months_en = [
+            "", "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ]
+        return f"{months_en[d.month]} {d.day}"
+    months_ru = [
         "", "января", "февраля", "марта", "апреля", "мая", "июня",
         "июля", "августа", "сентября", "октября", "ноября", "декабря"
     ]
-    return f"{d.day} {months[d.month]}"
+    return f"{d.day} {months_ru[d.month]}"
 
 
 def _tone_greeting():
-    """Приветствие в зависимости от тона."""
     tone = load_user_prompt().get("tone", "дружеский")
-    if tone == "краткий":
+    if tone in ("краткий", "brief"):
         return ""
-    if tone == "деловой":
-        return "Понял. "
+    if tone in ("деловой", "business"):
+        return _r("Понял. ", "Got it. ")
     return ""
 
 
@@ -667,19 +595,22 @@ def handle_show_events(text="", period_days=30):
     upcoming.sort(key=lambda x: x[0])
 
     if not upcoming:
-        return f"На ближайшие {period_days} {days_word(period_days)} событий нет 🐾"
+        return _r(
+            f"На ближайшие {period_days} {days_word(period_days)} событий нет 🐾",
+            f"No events in the next {period_days} days 🐾"
+        )
 
-    lines = [f"Ближайшие события:"]
+    lines = [_r("Ближайшие события:", "Upcoming events:")]
     for delta, e in upcoming:
         t = f"{int(e.get('hour',0)):02d}:{int(e.get('minute',0)):02d}"
         ev_date = date(int(e["year"]), int(e["month"]), int(e["day"]))
         if delta == 0:
-            when = "сегодня"
+            when = _r("сегодня", "today")
         elif delta == 1:
-            when = "завтра"
+            when = _r("завтра", "tomorrow")
         else:
             when = _fmt_date(ev_date)
-        lines.append(f"• {e['title']} — {when} в {t}")
+        lines.append(f"• {e['title']} — {when} {_r('в', 'at')} {t}")
 
     return "\n".join(lines)
 
@@ -711,14 +642,14 @@ def handle_show_birthdays(period_days=365):
     upcoming.sort(key=lambda x: x[0])
 
     if not upcoming:
-        return "Дней рождения пока нет 🐾"
+        return _r("Дней рождения пока нет 🐾", "No birthdays yet 🐾")
 
-    lines = ["Ближайшие дни рождения:"]
+    lines = [_r("Ближайшие дни рождения:", "Upcoming birthdays:")]
     for delta, bd, e in upcoming[:10]:
         if delta == 0:
-            when = "сегодня! 🎂"
+            when = _r("сегодня! 🎂", "today! 🎂")
         elif delta == 1:
-            when = f"завтра, {_fmt_date(bd)}"
+            when = _r(f"завтра, {_fmt_date(bd)}", f"tomorrow, {_fmt_date(bd)}")
         else:
             when = _fmt_date(bd)
         lines.append(f"• {e['title']} — {when}")
@@ -727,14 +658,15 @@ def handle_show_birthdays(period_days=365):
 
 
 def handle_show_all():
-    """Показывает события и дни рождения вместе."""
     ev = handle_show_events()
     bd = handle_show_birthdays()
-    if ev.startswith("На ближайшие") and bd.startswith("Дней рождения"):
-        return "Пока ничего не запланировано 🐾"
-    if ev.startswith("На ближайшие"):
+    ev_empty = ev.startswith("На ближайшие") or ev.startswith("No events")
+    bd_empty = bd.startswith("Дней рождения") or bd.startswith("No birthdays")
+    if ev_empty and bd_empty:
+        return _r("Пока ничего не запланировано 🐾", "Nothing planned yet 🐾")
+    if ev_empty:
         return bd
-    if bd.startswith("Дней рождения"):
+    if bd_empty:
         return ev
     return f"{ev}\n\n{bd}"
 
@@ -767,20 +699,29 @@ def handle_add_event(title, ev_date, ev_time, repeat="Без повтора",
     # Описание периода напоминания
     rm = int(remind_minutes)
     if rm == 0:
-        remind_str = "в момент события"
+        remind_str = _r("в момент события", "at event time")
     elif rm < 60:
-        remind_str = f"за {rm} мин"
+        remind_str = _r(f"за {rm} мин", f"{rm} min before")
     elif rm < 24*60:
         h, m = divmod(rm, 60)
-        remind_str = f"за {h} ч" + (f" {m} мин" if m else "")
+        remind_str = _r(f"за {h} ч" + (f" {m} мин" if m else ""), f"{h}h" + (f" {m}m" if m else "") + " before")
     else:
         d, rest = divmod(rm, 24*60)
         h, m = divmod(rest, 60)
         parts = [f"{d} {days_word(d)}"]
         if h: parts.append(f"{h} ч")
         if m: parts.append(f"{m} мин")
-        remind_str = "за " + " ".join(parts)
+        remind_str = _r("за ", "in ") + " ".join(parts)
 
+    if storage.current_language() == "en":
+        repeat_str = f"\n• Repeat: {repeat}" if repeat and repeat not in ("Без повтора", "no_repeat", "No repeat") else "\n• One time"
+        return (
+            f"Done! Event added:\n"
+            f"• {title}\n"
+            f"• {_fmt_date(ev_date)} at {t_str}\n"
+            f"• Reminder: {remind_str}"
+            f"{repeat_str} 🐾"
+        )
     repeat_str = f"\n• Повтор: {repeat}" if repeat and repeat != "Без повтора" else "\n• Один раз"
     return (
         f"Готово! Добавил событие:\n"
@@ -860,11 +801,9 @@ def detect_gender(name):
 
 
 def _to_genitive(name, gender=None):
-    """
-    Склоняет имя в родительный падеж: "День рождения Тани", "у Ивана".
-    gender — "m" или "f", если None — определяем сами.
-    """
     if not name:
+        return name
+    if storage.current_language() == "en":
         return name
     if gender is None:
         gender = detect_gender(name)
@@ -906,11 +845,9 @@ def _to_genitive(name, gender=None):
 
 
 def _to_dative(name, gender=None):
-    """
-    Склоняет имя в дательный падеж: "Сколько лет исполнится Тане".
-    gender — "m" или "f", если None — определяем сами.
-    """
     if not name:
+        return name
+    if storage.current_language() == "en":
         return name
     if gender is None:
         gender = detect_gender(name)
@@ -1015,6 +952,13 @@ def handle_add_birthday_full(name, gender, bd_date, birth_year,
     else:
         repeat_str = repeat
 
+    if storage.current_language() == "en":
+        return (
+            f"Got it! Birthday saved:\n"
+            f"• {name}{age_str} — {_fmt_date(bd_date)} 🎂\n"
+            f"• Reminder: {when_str}\n"
+            f"• Repeat: {repeat_str}"
+        )
     return (
         f"Запомнил! День рождения:\n"
         f"• {name}{age_str} — {_fmt_date(bd_date)} 🎂\n"
@@ -1039,15 +983,15 @@ def handle_delete_event(title_query):
     matches, events = handle_find_event(title_query)
 
     if not matches:
-        return f"Не нашёл событие «{title_query}» 🐾"
+        return _r(f"Не нашёл событие «{title_query}» 🐾", f"Event '{title_query}' not found 🐾")
 
     if len(matches) > 1:
         names = "\n".join(f"• {e['title']}" for e in matches)
-        return f"Нашёл несколько событий:\n{names}\n\nУточни название."
+        return _r(f"Нашёл несколько событий:\n{names}\n\nУточни название.", f"Found multiple events:\n{names}\n\nPlease be more specific.")
 
     events.remove(matches[0])
     save_events(events)
-    return f"Удалил событие «{matches[0]['title']}» 🐾"
+    return _r(f"Удалил событие «{matches[0]['title']}» 🐾", f"Deleted event '{matches[0]['title']}' 🐾")
 
 
 def handle_delete_birthday(name_query):
@@ -1068,14 +1012,14 @@ def handle_delete_birthday(name_query):
     found = [e for e in events if matches(e)]
 
     if not found:
-        return f"Не нашёл день рождения «{name_query}» 🐾"
+        return _r(f"Не нашёл день рождения «{name_query}» 🐾", f"Birthday for '{name_query}' not found 🐾")
     if len(found) > 1:
         names = "\n".join(f"• {e['title']}" for e in found)
-        return f"Нашёл несколько:\n{names}\n\nУточни имя."
+        return _r(f"Нашёл несколько:\n{names}\n\nУточни имя.", f"Found multiple:\n{names}\n\nPlease be more specific.")
 
     events.remove(found[0])
     save_events(events)
-    return f"Удалил {found[0]['title']} 🐾"
+    return _r(f"Удалил {found[0]['title']} 🐾", f"Deleted {found[0]['title']} 🐾")
 
 
 def handle_find_event(query):
@@ -1110,10 +1054,10 @@ def handle_edit_event(query, field, new_value, on_events_changed=None):
     matches, events = handle_find_event(query)
 
     if not matches:
-        return f"Не нашёл событие «{query}» 🐾"
+        return _r(f"Не нашёл событие «{query}» 🐾", f"Event '{query}' not found 🐾")
     if len(matches) > 1:
         names = "\n".join(f"• {e['title']}" for e in matches)
-        return f"Нашёл несколько событий, уточни название:\n{names}"
+        return _r(f"Нашёл несколько событий, уточни название:\n{names}", f"Found multiple events, please specify:\n{names}")
 
     idx   = events.index(matches[0])
     event = events[idx]
@@ -1140,6 +1084,13 @@ def handle_edit_event(query, field, new_value, on_events_changed=None):
     # Подтверждение
     t     = f"{int(event['hour']):02d}:{int(event['minute']):02d}"
     ev_d  = date(int(event["year"]), int(event["month"]), int(event["day"]))
+    if storage.current_language() == "en":
+        return (
+            f"Updated! Event:\n"
+            f"• {event['title']}\n"
+            f"• {_fmt_date(ev_d)} at {t}\n"
+            f"• Repeat: {event.get('repeat','no_repeat')} 🐾"
+        )
     return (
         f"Исправил! Событие:\n"
         f"• {event['title']}\n"
@@ -1171,10 +1122,11 @@ def process_message(text, on_events_changed=None):
     # --------------------------------------------------------
     if _state.waiting_for:
         t_low = text.lower().strip()
-        cancel_words = ("отмена", "отмени", "стоп", "забудь", "не надо", "хватит")
+        cancel_words = ("отмена", "отмени", "стоп", "забудь", "не надо", "хватит",
+                         "cancel", "stop", "nevermind", "forget it")
         if any(w in t_low for w in cancel_words):
             _state.reset()
-            return "Хорошо, отменил 🐾"
+            return _r("Хорошо, отменил 🐾", "Got it, cancelled 🐾")
 
         # Эти состояния обрабатывают ЛЮБОЙ ввод напрямую, без попытки
         # переопределить интент — иначе "др ани" при delete_what
@@ -1268,7 +1220,7 @@ def process_message(text, on_events_changed=None):
 
         if not query:
             _state.waiting_for = "edit_what"
-            return "Что нужно исправить? Напиши название события."
+            return _r("Что нужно исправить? Напиши название события.", "What should I fix? Write the event name.")
 
         _state.title = query  # сохраняем что редактируем
 
@@ -1277,9 +1229,9 @@ def process_message(text, on_events_changed=None):
 
         # Не смогли разобрать что именно менять — спрашиваем
         _state.waiting_for = "edit_field"
-        return (
-            f"Нашёл «{query}». Что исправить?\n"
-            f"• Напиши дату, время, название или повтор"
+        return _r(
+            f"Нашёл «{query}». Что исправить?\n• Напиши дату, время, название или повтор",
+            f"Found '{query}'. What to change?\n• Write date, time, title or repeat"
         )
 
     # --------------------------------------------------------
@@ -1291,7 +1243,7 @@ def process_message(text, on_events_changed=None):
         if title and len(title) >= 2:
             return handle_delete_event(title)
         _state.waiting_for = "delete_what"
-        return "Что удалить? Напиши название события или имя (для дня рождения)."
+        return _r("Что удалить? Напиши название события или имя (для дня рождения).", "What to delete? Write the event name or person's name (for birthday).")
 
     if intent == "delete_birthday":
         name = _extract_name(text)
@@ -1308,7 +1260,7 @@ def process_message(text, on_events_changed=None):
         if name:
             return handle_delete_birthday(name)
         _state.waiting_for = "delete_what"
-        return "Чей день рождения удалить? Напиши имя."
+        return _r("Чей день рождения удалить? Напиши имя.", "Whose birthday should I delete? Write the name.")
 
     # --------------------------------------------------------
     # ДОБАВИТЬ СОБЫТИЕ
@@ -1348,8 +1300,18 @@ def process_message(text, on_events_changed=None):
     # --------------------------------------------------------
     # ПРИВЕТСТВИЕ
     # --------------------------------------------------------
-    greetings = ["привет", "здравствуй", "хай", "салют", "добрый"]
+    greetings = ["привет", "здравствуй", "хай", "салют", "добрый",
+                 "hello", "hi", "hey", "good morning", "good evening"]
     if any(g in text.lower() for g in greetings):
+        if storage.current_language() == "en":
+            return (
+                f"Hey! I'm {pet_name} 🐾\n\n"
+                f"Here's what I can do:\n"
+                f"• Show events and birthdays\n"
+                f"• Add an event or birthday\n"
+                f"• Delete an event or birthday\n\n"
+                f"Just tell me what you need!"
+            )
         return (
             f"Привет! Я {pet_name} 🐾\n\n"
             f"Вот что я умею:\n"
@@ -1362,13 +1324,26 @@ def process_message(text, on_events_changed=None):
     # --------------------------------------------------------
     # СПАСИБО
     # --------------------------------------------------------
-    if any(w in text.lower() for w in ["спасибо", "спс", "благодарю"]):
-        return "Пожалуйста! 🐾"
+    if any(w in text.lower() for w in ["спасибо", "спс", "благодарю",
+                                        "thanks", "thank you", "thx"]):
+        if storage.current_language() == "en":
+            return "You're welcome! 🐾"
+        return _r("Пожалуйста! 🐾", "You're welcome! 🐾")
 
     # --------------------------------------------------------
     # НЕ ПОНЯЛ
     # --------------------------------------------------------
     _state.reset()
+    if storage.current_language() == "en":
+        return (
+            "Not sure I understood 🐾\n\n"
+            "I can:\n"
+            "• «show events» — upcoming events\n"
+            "• «show birthdays» — upcoming birthdays\n"
+            "• «add event meeting tomorrow at 3pm»\n"
+            "• «add birthday Maria March 15 1990»\n"
+            "• «delete event meeting»"
+        )
     return (
         "Не совсем понял 🐾\n\n"
         "Я умею:\n"
@@ -1408,7 +1383,7 @@ def _handle_clarification(text, on_events_changed=None):
         matches, _ = handle_find_event(_state.title)
         if not matches:
             _state.waiting_for = "edit_what"
-            return f"Не нашёл событие «{_state.title}». Попробуй написать название точнее."
+            return _r(f"Не нашёл событие «{_state.title}». Попробуй написать название точнее.", f"Event '{_state.title}' not found. Try a more specific name.")
         if len(matches) > 1:
             names = "\n".join(f"• {e['title']}" for e in matches)
             _state.waiting_for = "edit_what"
@@ -1426,16 +1401,24 @@ def _handle_clarification(text, on_events_changed=None):
 
         # Если пользователь написал только тип поля без значения —
         # запоминаем что ждём и переспрашиваем конкретное значение
-        if t_low in ("время", "дата", "дату", "название", "повтор", "повторение"):
-            field_hints = {
-                "время":      ("edit_value_time",  "Напиши новое время, например «15:00» или «в три дня»"),
-                "дата":       ("edit_value_date",  "Напиши новую дату, например «30 мая»"),
-                "дату":       ("edit_value_date",  "Напиши новую дату, например «30 мая»"),
-                "название":   ("edit_value_title", "Напиши новое название"),
-                "повтор":     ("edit_value_repeat","Напиши повтор: Один раз / Каждый день / Каждую неделю / Каждый месяц / Каждый год"),
-                "повторение": ("edit_value_repeat","Напиши повтор: Один раз / Каждый день / Каждую неделю / Каждый месяц / Каждый год"),
-            }
-            wf, prompt = field_hints[t_low]
+        _field_hints_ru = {
+            "время":      ("edit_value_time",  "Напиши новое время, например «15:00» или «в три дня»"),
+            "дата":       ("edit_value_date",  "Напиши новую дату, например «30 мая»"),
+            "дату":       ("edit_value_date",  "Напиши новую дату, например «30 мая»"),
+            "название":   ("edit_value_title", "Напиши новое название"),
+            "повтор":     ("edit_value_repeat","Напиши повтор: Один раз / Каждый день / Каждую неделю / Каждый месяц / Каждый год"),
+            "повторение": ("edit_value_repeat","Напиши повтор: Один раз / Каждый день / Каждую неделю / Каждый месяц / Каждый год"),
+        }
+        _field_hints_en = {
+            "time":   ("edit_value_time",  "Write the new time, e.g. '15:00' or '3pm'"),
+            "date":   ("edit_value_date",  "Write the new date, e.g. 'May 30'"),
+            "title":  ("edit_value_title", "Write the new title"),
+            "name":   ("edit_value_title", "Write the new title"),
+            "repeat": ("edit_value_repeat","Write repeat: Once / Every day / Every week / Every month / Every year"),
+        }
+        _field_hints = _field_hints_en if storage.current_language() == "en" else _field_hints_ru
+        if t_low in _field_hints:
+            wf, prompt = _field_hints[t_low]
             _state.waiting_for = wf
             return prompt
 
@@ -1465,7 +1448,7 @@ def _handle_clarification(text, on_events_changed=None):
 
         if field is None or new_value is None:
             _state.waiting_for = "edit_field"
-            return "Не понял. Напиши что изменить: дату, время, название или повтор."
+            return _r("Не понял. Напиши что изменить: дату, время, название или повтор.", "Didn't get that. Write what to change: date, time, title or repeat.")
 
         result = handle_edit_event(query, field, new_value, on_events_changed)
         _state.reset()
@@ -1476,7 +1459,7 @@ def _handle_clarification(text, on_events_changed=None):
         time_v = parse_time(text)
         if not time_v:
             _state.waiting_for = "edit_value_time"
-            return "Не понял время. Напиши например «15:00» или «в три дня»."
+            return _r("Не понял время. Напиши например «15:00» или «в три дня».", "Didn't get the time. Write e.g. '15:00' or '3pm'.")
         result = handle_edit_event(_state.title, "time", time_v, on_events_changed)
         _state.reset()
         return result
@@ -1486,7 +1469,7 @@ def _handle_clarification(text, on_events_changed=None):
         date_v = parse_date(text)
         if not date_v:
             _state.waiting_for = "edit_value_date"
-            return "Не понял дату. Напиши например «30 мая»."
+            return _r("Не понял дату. Напиши например «30 мая».", "Didn't get the date. Write e.g. 'May 30'.")
         result = handle_edit_event(_state.title, "date", date_v, on_events_changed)
         _state.reset()
         return result
@@ -1496,7 +1479,7 @@ def _handle_clarification(text, on_events_changed=None):
         candidate = text.strip().strip("\"«»'")
         if len(candidate) < 2:
             _state.waiting_for = "edit_value_title"
-            return "Название слишком короткое. Напиши новое название события."
+            return _r("Название слишком короткое. Напиши новое название события.", "Title is too short. Write a new event name.")
         result = handle_edit_event(_state.title, "title", candidate.capitalize(), on_events_changed)
         _state.reset()
         return result
@@ -1518,7 +1501,7 @@ def _handle_clarification(text, on_events_changed=None):
                 rep_v = "Каждый день"
         if not rep_v:
             _state.waiting_for = "edit_value_repeat"
-            return "Не понял. Напиши: Один раз / Каждый день / Каждую неделю / Каждый месяц / Каждый год"
+            return _r("Не понял. Напиши: Один раз / Каждый день / Каждую неделю / Каждый месяц / Каждый год", "Didn't get that. Write: Once / Every day / Every week / Every month / Every year")
         result = handle_edit_event(_state.title, "repeat", rep_v, on_events_changed)
         _state.reset()
         return result
@@ -1540,7 +1523,7 @@ def _handle_clarification(text, on_events_changed=None):
                 repeat = "Каждый год"
             else:
                 _state.waiting_for = "event_repeat"
-                return "Не понял. Выбери:\n• Один раз\n• Каждый день\n• Каждую неделю\n• Каждый месяц\n• Каждый год"
+                return _r("Не понял. Выбери:\n• Один раз\n• Каждый день\n• Каждую неделю\n• Каждый месяц\n• Каждый год", "Didn't get that. Choose:\n• Once\n• Every day\n• Every week\n• Every month\n• Every year")
         _state.repeat = repeat
         return _continue_event_flow(on_events_changed)
 
@@ -1578,8 +1561,10 @@ def _handle_clarification(text, on_events_changed=None):
                 _state.remind_minutes = int(t)
             else:
                 _state.waiting_for = "event_remind"
-                return ("Не понял. Выбери:\n"
-                        "• В момент\n• За 15 мин\n• За 30 мин\n• За час\n• За день")
+                return _r(
+                    "Не понял. Выбери:\n• В момент\n• За 15 мин\n• За 30 мин\n• За час\n• За день",
+                    "Didn't get that. Choose:\n• At time\n• 15 min before\n• 30 min before\n• 1 hour before\n• 1 day before"
+                )
         return _continue_event_flow(on_events_changed)
 
     # Год рождения / возраст
@@ -1602,11 +1587,9 @@ def _handle_clarification(text, on_events_changed=None):
                 else:
                     _state.waiting_for = "birthday_year"
                     _state.year_asked = False  # ещё не получили валидный ответ
-                    return (
-                        "Не понял. Напиши:\n"
-                        "• возраст — например «28» или «28 лет»\n"
-                        "• год рождения — например «1990»\n"
-                        "• или «пропустить»"
+                    return _r(
+                        "Не понял. Напиши:\n• возраст — например «28» или «28 лет»\n• год рождения — например «1990»\n• или «пропустить»",
+                        "Didn't get that. Write:\n• age — e.g. '28' or '28 years'\n• birth year — e.g. '1990'\n• or 'skip'"
                     )
         return _continue_birthday_flow(on_events_changed)
 
@@ -1620,7 +1603,7 @@ def _handle_clarification(text, on_events_changed=None):
         _state.event_date = parse_date(text)
         if not _state.event_date:
             _state.waiting_for = "event_date"
-            return "Не понял дату. Напиши например «завтра», «15 марта» или «15.03»"
+            return _r("Не понял дату. Напиши например «завтра», «15 марта» или «15.03»", "Didn't get the date. Write e.g. 'tomorrow', 'March 15' or '15.03'")
         return _continue_event_flow(on_events_changed)
 
     # Добавление события — время
@@ -1628,7 +1611,7 @@ def _handle_clarification(text, on_events_changed=None):
         _state.event_time = parse_time(text)
         if not _state.event_time:
             _state.waiting_for = "event_time"
-            return "Не понял время. Напиши например «в 15:00» или «в три»"
+            return _r("Не понял время. Напиши например «в 15:00» или «в три»", "Didn't get the time. Write e.g. '15:00' or '3pm'")
         return _continue_event_flow(on_events_changed)
 
     # Добавление ДР — имя
@@ -1645,7 +1628,7 @@ def _handle_clarification(text, on_events_changed=None):
             _state.gender = "f"
         else:
             _state.waiting_for = "birthday_gender"
-            return f"Не понял. {_state.title} — это мужчина или женщина?"
+            return _r(f"Не понял. {_state.title} — это мужчина или женщина?", f"Didn't get that. Is {_state.title} male or female?")
         return _continue_birthday_flow(on_events_changed)
 
     # Добавление ДР — дата
@@ -1662,7 +1645,7 @@ def _handle_clarification(text, on_events_changed=None):
                 _state.birth_year = age_to_birth_year(age)
         if not _state.event_date:
             _state.waiting_for = "birthday_date"
-            return "Не понял дату. Напиши например «15 марта» или «15.03.1990»"
+            return _r("Не понял дату. Напиши например «15 марта» или «15.03.1990»", "Didn't get the date. Write e.g. 'March 15' or '15.03.1990'")
         return _continue_birthday_flow(on_events_changed)
 
     # Добавление ДР — время напоминания
@@ -1681,7 +1664,7 @@ def _handle_clarification(text, on_events_changed=None):
                 _state.event_time = parsed
             else:
                 _state.waiting_for = "birthday_time"
-                return "Не понял время. Напиши например «09:00» или нажми кнопку."
+                return _r("Не понял время. Напиши например «09:00» или нажми кнопку.", "Didn't get the time. Write e.g. '09:00'.")
         return _continue_birthday_flow(on_events_changed)
 
     # Добавление ДР — за сколько до даты напомнить
@@ -1706,7 +1689,7 @@ def _handle_clarification(text, on_events_changed=None):
                 else:                      _state.remind_minutes = n
             else:
                 _state.waiting_for = "birthday_remind_period"
-                return "Не понял. Выбери из вариантов или напиши например «за 2 дня»."
+                return _r("Не понял. Выбери из вариантов или напиши например «за 2 дня».", "Didn't get that. Choose from options or write e.g. '2 days before'.")
         return _continue_birthday_flow(on_events_changed)
 
     # Добавление ДР — повтор
@@ -1724,11 +1707,11 @@ def _handle_clarification(text, on_events_changed=None):
             _state.repeat = "Без повтора"
         else:
             _state.waiting_for = "birthday_repeat"
-            return "Не понял. Выбери из вариантов."
+            return _r("Не понял. Выбери из вариантов.", "Didn't get that. Please choose from the options.")
         return _continue_birthday_flow(on_events_changed)
 
     _state.reset()
-    return "Не понял. Попробуй снова 🐾"
+    return _r("Не понял. Попробуй снова 🐾", "Didn't understand. Please try again 🐾")
 
 
 # ================================================================
@@ -1741,12 +1724,12 @@ def _continue_birthday_flow(on_events_changed=None):
 
     if not _state.title:
         _state.waiting_for = "birthday_name"
-        return "Чей день рождения добавить? Напиши имя."
+        return _r("Чей день рождения добавить? Напиши имя.", "Whose birthday? Write a name.")
 
     # Двуполое имя — нужно явно уточнить
     if _state.gender is None and is_ambiguous_gender(_state.title):
         _state.waiting_for = "birthday_gender"
-        return f"Имя «{_state.title}» бывает мужским и женским. Подскажи, кто это?"
+        return _r(f"Имя «{_state.title}» бывает мужским и женским. Подскажи, кто это?", f"The name '{_state.title}' can be male or female. Which one?")
 
     # Пол ещё не задан — определяем сами
     if _state.gender is None:
@@ -1754,10 +1737,16 @@ def _continue_birthday_flow(on_events_changed=None):
 
     if not _state.event_date:
         _state.waiting_for = "birthday_date"
-        return f"Когда день рождения у {_to_genitive(_state.title, _state.gender)}? Напиши дату."
+        return _r(f"Когда день рождения у {_to_genitive(_state.title, _state.gender)}? Напиши дату.", f"When is {_state.title}'s birthday? Write the date.")
 
     if _state.birth_year is None and not _state.year_asked:
         _state.waiting_for = "birthday_year"
+        if storage.current_language() == "en":
+            return (
+                f"How old will {_state.title} be?\n"
+                f"You can write age ('28') or birth year ('1990').\n"
+                f"If you don't know — press Skip."
+            )
         return (
             f"Сколько лет исполнится {_to_dative(_state.title, _state.gender)}?\n"
             f"Можно написать возраст («28») или год рождения («1990»).\n"
@@ -1766,15 +1755,15 @@ def _continue_birthday_flow(on_events_changed=None):
 
     if _state.event_time is None:
         _state.waiting_for = "birthday_time"
-        return "В какое время напомнить? Можно написать «09:00» или нажать кнопку."
+        return _r("В какое время напомнить? Можно написать «09:00» или нажать кнопку.", "What time should I remind you? Write e.g. '09:00'.")
 
     if _state.remind_minutes is None:
         _state.waiting_for = "birthday_remind_period"
-        return "За сколько до даты напомнить?"
+        return _r("За сколько до даты напомнить?", "How far in advance should I remind you?")
 
     if _state.repeat is None:
         _state.waiting_for = "birthday_repeat"
-        return "Как часто напоминать?"
+        return _r("Как часто напоминать?", "How often should I remind you?")
 
     # Всё собрано — создаём событие
     result = handle_add_birthday_full(
@@ -1797,26 +1786,29 @@ def _continue_event_flow(on_events_changed=None):
 
     if not _state.title:
         _state.waiting_for = "event_title"
-        return "Как назвать событие?"
+        return _r("Как назвать событие?", "What's the event name?")
 
     if not _state.event_date:
         _state.waiting_for = "event_date"
-        return f"На какую дату добавить «{_state.title}»?"
+        return _r(f"На какую дату добавить «{_state.title}»?", f"What date for '{_state.title}'?")
 
     if not _state.event_time:
         _state.waiting_for = "event_time"
-        return "В какое время?"
+        return _r("В какое время?", "What time?")
 
     if _state.repeat is None:
         _state.waiting_for = "event_repeat"
-        return ("Как часто повторяется?\n"
-                "• Один раз\n• Каждый день\n• Каждую неделю\n"
-                "• Каждый месяц\n• Каждый год")
+        return _r(
+            "Как часто повторяется?\n• Один раз\n• Каждый день\n• Каждую неделю\n• Каждый месяц\n• Каждый год",
+            "How often does it repeat?\n• Once\n• Every day\n• Every week\n• Every month\n• Every year"
+        )
 
     if _state.remind_minutes is None:
         _state.waiting_for = "event_remind"
-        return ("За сколько до события напомнить?\n"
-                "• В момент\n• За 15 мин\n• За 30 мин\n• За час\n• За день")
+        return _r(
+            "За сколько до события напомнить?\n• В момент\n• За 15 мин\n• За 30 мин\n• За час\n• За день",
+            "How long before the event should I remind you?\n• At time\n• 15 min before\n• 30 min before\n• 1 hour before\n• 1 day before"
+        )
 
     # Всё собрано — создаём
     result = handle_add_event(

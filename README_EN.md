@@ -1,18 +1,14 @@
-<h1 align="center"><img src="Icon.png" width="200"></h1>
+<div align="center">
 
-<h1 align="center">🐾 Pet Reminder v10.2 🐾 </h1>
+# 🐾 Pet Reminder v10.2
 
-<p align="center">
-Desktop pet with a smart reminder system 
-Lightweight • Unobtrusive • Always by your side 
-</p>
+Desktop pet with a smart reminder system  
+Lightweight • Unobtrusive • Always by your side
 
-<p align="center">
-  <img src="https://img.shields.io/badge/version-10.2-blue">
-  <img src="https://img.shields.io/badge/python-3.14+-yellow">
-  <img src="https://img.shields.io/badge/platform-Windows-lightgrey">
-  <img src="https://img.shields.io/badge/status-stable-brightgreen">
-</p>
+![version](https://img.shields.io/badge/version-10.2-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+
+</div>
+
 ---
 
 ## About
@@ -105,3 +101,5 @@ pyinstaller --noconfirm --clean --onefile --windowed ^
 
 **Version:** 10.2 · **Status:** Stable  
 Made with ❤️ in Python
+
+</div>

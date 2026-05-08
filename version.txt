@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(10,1,0,0),
-    prodvers=(10,1,0,0),
+    filevers=(10,2,0,0),
+    prodvers=(10,2,0,0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -17,10 +17,11 @@ VSVersionInfo(
         [
           StringStruct('CompanyName', 'PetReminder Studio'),
           StringStruct('FileDescription', 'Pet Reminder App'),
-          StringStruct('FileVersion', '10.1.0'),
-          StringStruct('ProductVersion', '10.1.0'),
+          StringStruct('FileVersion', '10.2.0'),
+          StringStruct('ProductVersion', '10.2.0'),
           StringStruct('ProductName', 'Pet Reminder'),
           StringStruct('OriginalFilename', 'pet.exe'),
+          StringStruct('LegalCopyright', 'kaiCATs'),
           StringStruct('Language', 'English')
         ]
       )

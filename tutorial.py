@@ -1,7 +1,8 @@
 # ================================================================
-# ИМПОРТЫ
+# TUTORIAL
+# On-boarding flow shown on first launch.
+# Uses storage (replaces config) and locale_app for all strings.
 # ================================================================
-import os
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -15,11 +16,12 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtGui import QFont
 
-from config import save_pet_name, load_pet_name, mark_tutorial_done
+import storage
+from locale_app import t
 
 
 # ================================================================
-# ФИЛЬТР ЗАПРЕЩЁННЫХ СЛОВ
+# PROFANITY FILTER
 # ================================================================
 _BAD_WORDS = [
     "хуй", "хуе", "хуя", "хуи", "пизд", "ебл", "ёбл", "еба", "ёба",
@@ -28,104 +30,35 @@ _BAD_WORDS = [
     "fuck", "shit", "bitch", "cunt", "dick", "cock", "ass",
 ]
 
-def _contains_bad_word(text):
-    lower = text.lower()
-    return any(bad in lower for bad in _BAD_WORDS)
+def _contains_bad_word(text: str) -> bool:
+    low = text.lower()
+    return any(w in low for w in _BAD_WORDS)
 
 
 # ================================================================
-# ШАГИ ТУТОРИАЛА
+# TUTORIAL STEPS — titles and texts come from locale_app
 # ================================================================
-TUTORIAL_STEPS = [
-    {
-        "title": "Привет! 🐾",
-        "text": (
-            "Я твой desktop-питомец и помощник.\n\n"
-            "Живу прямо на рабочем столе —\n"
-            "всегда рядом, но никогда не мешаю.\n\n"
-            "Меня можно перетаскивать куда удобно."
-        ),
-    },
-    {
-        "title": "Системный трей 🖥",
-        "text": (
-            "Мою иконку ищи в правом нижнем\n"
-            "углу экрана — рядом с часами.\n\n"
-            "Если не видишь — нажми стрелку ^\n"
-            "рядом с часами, я прячусь там.\n\n"
-            "Правый клик по иконке — моё меню."
-        ),
-    },
-    {
-        "title": "Дни рождения 🎂",
-        "text": (
-            "Я помню о днях рождения близких.\n\n"
-            "Меню → 🎂 Дни рождения →\n"
-            "добавь имя и дату.\n\n"
-            "Напомню за 7 и за 3 дня,\n"
-            "и сам посчитаю сколько лет."
-        ),
-    },
-    {
-        "title": "События 🗓",
-        "text": (
-            "Меню → 🗓 События → выбери дату\n"
-            "→ нажми «Добавить событие».\n\n"
-            "Задай время и когда напомнить.\n\n"
-            "Двойной клик — редактировать.\n"
-            "Правый клик — удалить."
-        ),
-    },
-    {
-        "title": "Уведомления 🔔",
-        "text": (
-            "Когда придёт время — покажу\n"
-            "уведомление в правом нижнем углу.\n\n"
-            "Тёмное — день рождения.\n"
-            "Синее — событие.\n\n"
-            "Закроются сами через 6 секунд."
-        ),
-    },
-    {
-        "title": "Текстовый помощник 💬",
-        "text": (
-            "Нажми правой кнопкой мыши\n"
-            "на зверька на рабочем столе —\n"
-            "откроется окно чата.\n\n"
-            "Пиши мне напрямую — задавай\n"
-            "вопросы, проси напомнить\n"
-            "о событии или узнай что\n"
-            "запланировано.\n\n"
-            "При первом открытии я сам\n"
-            "скачаю нужный модуль."
-        ),
-    },
-    {
-        "title": "Всё готово! 🎉",
-        "text": (
-            "Теперь ты знаешь всё что нужно.\n\n"
-            "Я буду рядом и вовремя\n"
-            "напомню о важном.\n\n"
-            "Туториал снова: меню трея → ❓"
-        ),
-    },
+_STEP_KEYS = [
+    ("tut_s0_title", "tut_s0_text"),
+    ("tut_s1_title", "tut_s1_text"),
+    ("tut_s2_title", "tut_s2_text"),
+    ("tut_s3_title", "tut_s3_text"),
+    ("tut_s4_title", "tut_s4_text"),
+    ("tut_s5_title", "tut_s5_text"),
+    ("tut_s6_title", "tut_s6_text"),
 ]
 
 
 # ================================================================
-# ОКНО ВВОДА ИМЕНИ ПИТОМЦА
-# Защищённое — нельзя закрыть без сохранения имени.
+# PET NAME DIALOG
 # ================================================================
 class PetNameDialog(QWidget):
     def __init__(self, on_name_saved=None):
         super().__init__()
-
         self.on_name_saved = on_name_saved
 
         self.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint |
-            Qt.Window
+            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Window
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setFixedSize(440, 300)
@@ -133,7 +66,7 @@ class PetNameDialog(QWidget):
         screen = QApplication.primaryScreen().availableGeometry()
         self.move(
             screen.center().x() - self.width() // 2,
-            screen.center().y() - self.height() // 2
+            screen.center().y() - self.height() // 2,
         )
 
         self.container = QFrame(self)
@@ -144,21 +77,18 @@ class PetNameDialog(QWidget):
         layout.setSpacing(15)
         layout.setContentsMargins(35, 35, 35, 35)
 
-        title = QLabel("Как меня назвать? 🐾")
+        title = QLabel(t("name_title"))
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 22px; font-weight: bold; color: #222;")
         layout.addWidget(title)
 
-        hint = QLabel(
-            "Придумай мне имя — потом ты сможешь\n"
-            "вызывать меня голосом по имени."
-        )
+        hint = QLabel(t("name_hint"))
         hint.setAlignment(Qt.AlignCenter)
         hint.setStyleSheet("font-size: 15px; color: #555;")
         layout.addWidget(hint)
 
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Введи имя питомца...")
+        self.name_input.setPlaceholderText(t("name_ph"))
         self.name_input.setMaxLength(20)
         self.name_input.setStyleSheet("font-size: 16px;")
         self.name_input.returnPressed.connect(self._save)
@@ -169,7 +99,7 @@ class PetNameDialog(QWidget):
         self.error_label.setStyleSheet("font-size: 13px; color: #e81123;")
         layout.addWidget(self.error_label)
 
-        self.save_btn = QPushButton("Сохранить имя")
+        self.save_btn = QPushButton(t("name_save"))
         self.save_btn.clicked.connect(self._save)
         layout.addWidget(self.save_btn)
 
@@ -180,7 +110,7 @@ class PetNameDialog(QWidget):
     def _apply_style(self):
         self.setStyleSheet("""
         QFrame#container {
-            background-color: rgba(255, 255, 255, 0.97);
+            background-color: rgba(255,255,255,0.97);
             border-radius: 20px;
         }
         QLineEdit {
@@ -189,9 +119,7 @@ class PetNameDialog(QWidget):
             padding: 10px 14px;
             font-size: 16px;
         }
-        QLineEdit:focus {
-            border-color: #005ea6;
-        }
+        QLineEdit:focus { border-color: #005ea6; }
         QPushButton {
             background-color: #0078D7;
             color: white;
@@ -199,9 +127,7 @@ class PetNameDialog(QWidget):
             padding: 12px;
             font-size: 15px;
         }
-        QPushButton:hover {
-            background-color: #005ea6;
-        }
+        QPushButton:hover { background-color: #005ea6; }
         """)
 
     def _fade_in(self):
@@ -216,28 +142,24 @@ class PetNameDialog(QWidget):
 
     def _save(self):
         name = self.name_input.text().strip()
-
         if not name:
-            self.error_label.setText("Имя не может быть пустым")
+            self.error_label.setText(t("name_empty"))
             return
         if len(name) < 2:
-            self.error_label.setText("Имя слишком короткое")
+            self.error_label.setText(t("name_short"))
             return
         if _contains_bad_word(name):
-            self.error_label.setText("Пожалуйста, придумай другое имя 🙏")
+            self.error_label.setText(t("name_bad"))
             return
 
-        save_pet_name(name)
+        storage.save_pet_name(name)
         self.error_label.setText("")
-
         if self.on_name_saved:
             self.on_name_saved(name)
-
         self.close()
 
     def closeEvent(self, event):
-        # Запрещаем закрытие если имя ещё не задано
-        if load_pet_name() is None:
+        if storage.load_pet_name() is None:
             event.ignore()
         else:
             event.accept()
@@ -252,114 +174,85 @@ class PetNameDialog(QWidget):
 
 
 # ================================================================
-# СТРАНИЦА ШАГА — один экран внутри слайдера
-# ================================================================
-class StepPage(QWidget):
-    """Один экран туториала — заголовок + текст. Живёт внутри QStackedWidget."""
-
-    def __init__(self, step_data):
-        super().__init__()
-
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setAlignment(Qt.AlignTop)
-
-        title = QLabel(step_data["title"])
-        title.setAlignment(Qt.AlignLeft)
-        title.setStyleSheet(
-            "font-size: 20px; font-weight: bold; color: #111;"
-        )
-        layout.addWidget(title)
-
-        text = QLabel(step_data["text"])
-        text.setWordWrap(True)
-        text.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        text.setStyleSheet(
-            "font-size: 16px; color: #333; line-height: 1.6;"
-        )
-        layout.addWidget(text)
-        layout.addStretch()
-
-
-# ================================================================
-# ОКНО ТУТОРИАЛА С АНИМАЦИЕЙ ЛИСТАНИЯ
-#
-# Одно окно, внутри QStackedWidget со страницами.
-# При переходе между шагами старая страница уезжает влево,
-# новая въезжает справа — эффект листания книги.
+# TUTORIAL WINDOW
 # ================================================================
 class TutorialWindow(QWidget):
     def __init__(self, on_finished=None):
         super().__init__()
-
         self.on_finished    = on_finished
         self._current_index = 0
-        self._animating     = False  # защита от двойного клика во время анимации
+        self._animating     = False
 
         self.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint |
-            Qt.Tool
+            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Window
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(440, 420)
+        self.setFixedSize(400, 340)
 
-        # Позиция — правый нижний угол над тостами
         screen = QApplication.primaryScreen().availableGeometry()
-        self._end_x = screen.right() - self.width() - 20
-        self._end_y = screen.bottom() - self.height() - 180
+        self._end_x = screen.right()  - self.width()  - 30
+        self._end_y = screen.bottom() - self.height() - 30
         self.move(self._end_x, screen.bottom() + 10)
 
-        # Контейнер
-        self.container = QFrame(self)
-        self.container.setGeometry(0, 0, 440, 420)
-        self.container.setObjectName("tutContainer")
+        # Container
+        self._cont = QFrame(self)
+        self._cont.setGeometry(0, 0, 400, 340)
+        self._cont.setObjectName("tutContainer")
 
-        outer = QVBoxLayout(self.container)
-        outer.setContentsMargins(28, 24, 28, 24)
-        outer.setSpacing(16)
+        outer = QVBoxLayout(self._cont)
+        outer.setContentsMargins(24, 20, 24, 20)
+        outer.setSpacing(10)
 
-        # Прогресс-точки
-        self._dots_layout = QHBoxLayout()
-        self._dots_layout.setSpacing(6)
-        self._dots_layout.addStretch()
-        self._build_dots()
-        self._dots_layout.addStretch()
-        outer.addLayout(self._dots_layout)
-
-        # Область слайдов — обрезаем контент по размеру
-        self._slide_area = QWidget()
-        self._slide_area.setFixedSize(384, 270)
+        # Slide area
+        self._slide_area = QFrame()
+        self._slide_area.setFixedSize(352, 210)
         self._slide_area.setStyleSheet("background: transparent;")
+        self._slide_area.setClipChildren(True)
         outer.addWidget(self._slide_area)
 
-        # Создаём все страницы сразу
+        # Pages
         self._pages = []
-        for step in TUTORIAL_STEPS:
-            page = StepPage(step)
-            page.setParent(self._slide_area)
-            page.setGeometry(0, 0, 384, 270)
-            page.hide()
+        for title_key, text_key in _STEP_KEYS:
+            page = QWidget(self._slide_area)
+            page.setGeometry(0, 0, 352, 210)
+            pl = QVBoxLayout(page)
+            pl.setContentsMargins(0, 0, 0, 0)
+            pl.setSpacing(12)
+
+            lbl_title = QLabel(t(title_key))
+            lbl_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #222;")
+            pl.addWidget(lbl_title)
+
+            lbl_text = QLabel(t(text_key))
+            lbl_text.setWordWrap(True)
+            lbl_text.setStyleSheet("font-size: 14px; color: #444; line-height: 1.4;")
+            pl.addWidget(lbl_text)
+            pl.addStretch()
+
             self._pages.append(page)
 
-        # Показываем первую страницу
-        self._pages[0].show()
+        for i, p in enumerate(self._pages):
+            p.setVisible(i == 0)
 
-        # Кнопки
+        # Dots
+        dots_layout = QHBoxLayout()
+        dots_layout.setSpacing(6)
+        self._dots_layout = dots_layout
+        outer.addLayout(dots_layout)
+        self._build_dots()
+
+        # Buttons
         btn_layout = QHBoxLayout()
-
-        self._skip_btn = QPushButton("Пропустить всё")
+        self._skip_btn = QPushButton(t("tut_skip"))
         self._skip_btn.setObjectName("skipBtn")
         self._skip_btn.clicked.connect(self._skip_all)
-        btn_layout.addWidget(self._skip_btn)
 
-        btn_layout.addStretch()
-
-        self._next_btn = QPushButton("Далее →")
+        self._next_btn = QPushButton(t("tut_next"))
         self._next_btn.clicked.connect(self._next)
-        btn_layout.addWidget(self._next_btn)
 
+        btn_layout.addWidget(self._skip_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self._next_btn)
         outer.addLayout(btn_layout)
 
         self._apply_style()
@@ -367,28 +260,27 @@ class TutorialWindow(QWidget):
         self.show()
 
     def _build_dots(self):
-        """Строит индикатор прогресса из точек."""
-        # Очищаем старые точки (кроме stretch-ов)
-        while self._dots_layout.count() > 2:
-            item = self._dots_layout.takeAt(1)
+        while self._dots_layout.count():
+            item = self._dots_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        # Перестраиваем
-        for i in range(len(TUTORIAL_STEPS)):
+        self._dots_layout.addStretch()
+        for i in range(len(_STEP_KEYS)):
             dot = QLabel("●" if i == self._current_index else "○")
             dot.setStyleSheet(
                 "font-size: 14px; color: #0078D7;" if i == self._current_index
                 else "font-size: 14px; color: #ccc;"
             )
             self._dots_layout.insertWidget(i + 1, dot)
+        self._dots_layout.addStretch()
 
     def _apply_style(self):
         self.setStyleSheet("""
         QFrame#tutContainer {
-            background-color: rgba(255, 255, 255, 0.97);
+            background-color: rgba(255,255,255,0.97);
             border-radius: 20px;
-            border: 1px solid rgba(0, 120, 215, 0.25);
+            border: 1px solid rgba(0,120,215,0.25);
         }
         QPushButton {
             background-color: #0078D7;
@@ -397,22 +289,16 @@ class TutorialWindow(QWidget):
             padding: 9px 20px;
             font-size: 14px;
         }
-        QPushButton:hover {
-            background-color: #005ea6;
-        }
+        QPushButton:hover { background-color: #005ea6; }
         QPushButton#skipBtn {
             background-color: transparent;
             color: #999;
             border: 1px solid #ddd;
         }
-        QPushButton#skipBtn:hover {
-            background-color: #f5f5f5;
-            color: #666;
-        }
+        QPushButton#skipBtn:hover { background-color: #f5f5f5; color: #666; }
         """)
 
     def _slide_in(self):
-        """Окно въезжает снизу при открытии."""
         self._anim_win = QPropertyAnimation(self, b"pos")
         self._anim_win.setDuration(380)
         self._anim_win.setStartValue(QPoint(self._end_x, self._end_y + 300))
@@ -421,7 +307,6 @@ class TutorialWindow(QWidget):
         self._anim_win.start()
 
     def _slide_out_window(self, callback):
-        """Окно уезжает вниз при закрытии."""
         screen = QApplication.primaryScreen().availableGeometry()
         self._anim_close = QPropertyAnimation(self, b"pos")
         self._anim_close.setDuration(280)
@@ -432,31 +317,21 @@ class TutorialWindow(QWidget):
         self._anim_close.start()
 
     def _animate_page_turn(self, old_idx, new_idx):
-        """
-        Анимация листания страницы:
-        - Старая страница уезжает влево за край области
-        - Новая страница въезжает справа
-        """
         if self._animating:
             return
         self._animating = True
-
         w = self._slide_area.width()
         old_page = self._pages[old_idx]
         new_page = self._pages[new_idx]
-
-        # Ставим новую страницу справа за видимой областью
         new_page.setGeometry(w, 0, w, self._slide_area.height())
         new_page.show()
 
-        # Анимация старой — уезжает влево
         self._anim_old = QPropertyAnimation(old_page, b"geometry")
         self._anim_old.setDuration(320)
         self._anim_old.setStartValue(QRect(0, 0, w, self._slide_area.height()))
         self._anim_old.setEndValue(QRect(-w, 0, w, self._slide_area.height()))
         self._anim_old.setEasingCurve(QEasingCurve.InOutCubic)
 
-        # Анимация новой — въезжает справа
         self._anim_new = QPropertyAnimation(new_page, b"geometry")
         self._anim_new.setDuration(320)
         self._anim_new.setStartValue(QRect(w, 0, w, self._slide_area.height()))
@@ -469,40 +344,31 @@ class TutorialWindow(QWidget):
             self._animating = False
 
         self._anim_new.finished.connect(on_done)
-
         self._anim_old.start()
         self._anim_new.start()
 
     def _next(self):
         if self._animating:
             return
-
         old_idx = self._current_index
-        is_last = self._current_index == len(TUTORIAL_STEPS) - 1
-
-        if is_last:
+        if self._current_index == len(_STEP_KEYS) - 1:
             self._slide_out_window(self._finish)
             return
-
         self._current_index += 1
         self._animate_page_turn(old_idx, self._current_index)
         self._build_dots()
-
-        # Обновляем текст кнопки на последнем шаге
-        if self._current_index == len(TUTORIAL_STEPS) - 1:
-            self._next_btn.setText("Завершить ✓")
+        if self._current_index == len(_STEP_KEYS) - 1:
+            self._next_btn.setText(t("tut_finish"))
 
     def _skip_all(self):
-        if self._animating:
-            return
-        self._slide_out_window(self._finish)
+        if not self._animating:
+            self._slide_out_window(self._finish)
 
     def _finish(self):
-        mark_tutorial_done()
+        storage.mark_tutorial_done()
         if self.on_finished:
             self.on_finished()
 
-    # Перетаскивание окна
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
@@ -510,36 +376,25 @@ class TutorialWindow(QWidget):
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.LeftButton and hasattr(self, "_drag_pos"):
             self.move(event.globalPos() - self._drag_pos)
-            # Обновляем конечную позицию для анимации закрытия
             self._end_x = self.pos().x()
             self._end_y = self.pos().y()
 
 
 # ================================================================
-# МЕНЕДЖЕР ТУТОРИАЛА
+# TUTORIAL MANAGER
 # ================================================================
 class TutorialManager:
     def __init__(self, on_finished=None, skip_name=False):
-        """
-        on_finished — колбэк после завершения туториала.
-        skip_name   — True если имя уже задано (вызов из трея).
-                      В этом случае окно имени пропускается.
-        """
         self.on_finished = on_finished
         self.skip_name   = skip_name
 
     def start(self):
-        """
-        Если имя уже задано — сразу показываем шаги туториала.
-        Если нет — сначала окно ввода имени.
-        """
-        if self.skip_name or load_pet_name() is not None:
+        if self.skip_name or storage.load_pet_name() is not None:
             self._window = TutorialWindow(on_finished=self._on_finished)
         else:
             self._name_dialog = PetNameDialog(on_name_saved=self._on_name_saved)
 
     def _on_name_saved(self, name):
-        """Имя сохранено — запускаем шаги."""
         self._window = TutorialWindow(on_finished=self._on_finished)
 
     def _on_finished(self):
@@ -548,25 +403,22 @@ class TutorialManager:
 
 
 # ================================================================
-# ПУЗЫРЬ-НАПОМИНАНИЕ ОБ ИМЕНИ
-# Показывается через 10 минут если имя не задано.
+# NAME REMINDER BUBBLE
+# Shown 10 min after launch if the pet has no name yet.
 # ================================================================
 class NameReminderBubble(QWidget):
     def __init__(self, on_name_now=None):
         super().__init__()
-
         self.on_name_now = on_name_now
 
         self.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint |
-            Qt.Tool
+            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setFixedSize(340, 140)
 
         screen = QApplication.primaryScreen().availableGeometry()
-        end_x = screen.right() - self.width() - 20
+        end_x = screen.right()  - self.width()  - 20
         end_y = screen.bottom() - self.height() - 20
 
         container = QFrame(self)
@@ -577,34 +429,27 @@ class NameReminderBubble(QWidget):
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(10)
 
-        text = QLabel(
-            "Эй, меня так и не назвали! 🐾\n"
-            "Имя нужно для голосовых команд."
-        )
+        text = QLabel(t("bubble_text"))
         text.setWordWrap(True)
         text.setStyleSheet("font-size: 15px; color: white;")
         layout.addWidget(text)
 
-        btn = QPushButton("Назвать сейчас")
+        btn = QPushButton(t("bubble_btn"))
         btn.clicked.connect(self._open_name_dialog)
         layout.addWidget(btn)
 
         self.setStyleSheet("""
         QFrame#bubble {
-            background-color: rgba(40, 40, 40, 230);
+            background-color: rgba(40,40,40,230);
             border-radius: 15px;
         }
         QPushButton {
-            background-color: #0078D7;
-            color: white;
-            border-radius: 8px;
-            padding: 7px;
-            font-size: 14px;
+            background-color: #0078D7; color: white;
+            border-radius: 8px; padding: 7px; font-size: 14px;
         }
         QPushButton:hover { background-color: #005ea6; }
         """)
 
-        # Анимация появления снизу
         self.move(end_x, screen.bottom() + 10)
         self._anim = QPropertyAnimation(self, b"pos")
         self._anim.setDuration(350)
