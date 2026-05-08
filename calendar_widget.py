@@ -11,9 +11,20 @@ class CustomCalendar(QCalendarWidget):
 
         self.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
         self.setFirstDayOfWeek(Qt.Monday)
+            
+        import storage
+        from PyQt5.QtCore import QLocale
+        lang = storage.current_language()
+        locale = QLocale(QLocale.English) if lang == "en" else QLocale(QLocale.Russian)
+        self.setLocale(locale)
 
     def set_events(self, events):
         self.events = events or []
+        import storage
+        from PyQt5.QtCore import QLocale
+        lang = storage.current_language()
+        locale = QLocale(QLocale.English) if lang == "en" else QLocale(QLocale.Russian)
+        self.setLocale(locale)
         self.update()
 
     def paintCell(self, painter, rect, date):

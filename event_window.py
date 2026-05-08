@@ -200,17 +200,19 @@ class EventWindow(QWidget):
             Qt.FramelessWindowHint | Qt.Window | Qt.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(520, 560)
+        self.setFixedSize(900, 600)
+
+        self.setFixedSize(900, 600)
 
         from PyQt5.QtWidgets import QApplication
         screen = QApplication.primaryScreen().availableGeometry()
         self.move(
-            screen.center().x() - self.width()  // 2,
+            screen.center().x() - self.width() // 2,
             screen.center().y() - self.height() // 2,
         )
 
         container = QFrame(self)
-        container.setGeometry(0, 0, 520, 560)
+        container.setGeometry(0, 0, 900, 600)
         container.setObjectName("evContainer")
 
         outer = QVBoxLayout(container)
@@ -224,11 +226,11 @@ class EventWindow(QWidget):
         header_row.addWidget(title_lbl)
         header_row.addStretch()
 
-        theme_btn = QPushButton("🌙" if not is_dark else "☀️")
-        theme_btn.setObjectName("themeBtn")
-        theme_btn.setFixedSize(36, 36)
-        theme_btn.clicked.connect(self._toggle_theme)
-        header_row.addWidget(theme_btn)
+        self.theme_btn = QPushButton("🌙" if not is_dark else "☀️")
+        self.theme_btn.setObjectName("themeBtn")
+        self.theme_btn.setFixedSize(36, 36)
+        self.theme_btn.clicked.connect(self._toggle_theme)
+        header_row.addWidget(self.theme_btn)
 
         close_btn = QPushButton("✕")
         close_btn.setObjectName("closeBtn")
@@ -237,35 +239,46 @@ class EventWindow(QWidget):
         header_row.addWidget(close_btn)
         outer.addLayout(header_row)
 
-        # Calendar
+        # Main row: calendar LEFT, events RIGHT
+        main_row = QHBoxLayout()
+        main_row.setSpacing(16)
+
+        # Calendar frame (left)
         cal_frame = QFrame()
         cal_frame.setObjectName("calFrame")
         cal_layout = QVBoxLayout(cal_frame)
         cal_layout.setContentsMargins(8, 8, 8, 8)
-        self.calendar = CustomCalendar()
-        self.calendar.set_events(self.events)
+        self.calendar = CustomCalendar(self.events)
         self.calendar.selectionChanged.connect(self.refresh_events)
         cal_layout.addWidget(self.calendar)
-        outer.addWidget(cal_frame)
+        main_row.addWidget(cal_frame, stretch=3)
 
-        # Events list
+        # Right panel: title + list + hint + button
+        right_panel = QVBoxLayout()
+        right_panel.setSpacing(8)
+
+        events_title = QLabel(t("ev_title"))
+        events_title.setObjectName("eventsTitle")
+        right_panel.addWidget(events_title)
+
         self.events_list = QListWidget()
         self.events_list.setAlternatingRowColors(True)
         self.events_list.itemDoubleClicked.connect(self.edit_event)
         self.events_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.events_list.customContextMenuRequested.connect(self.delete_event)
-        outer.addWidget(self.events_list)
+        right_panel.addWidget(self.events_list, stretch=1)
 
-        # Hint
         hint_lbl = QLabel(t("ev_hint"))
         hint_lbl.setObjectName("hintLabel")
         hint_lbl.setAlignment(Qt.AlignCenter)
-        outer.addWidget(hint_lbl)
+        right_panel.addWidget(hint_lbl)
 
-        # Add button
         add_btn = QPushButton(t("ev_add"))
         add_btn.clicked.connect(self.add_event)
-        outer.addWidget(add_btn)
+        right_panel.addWidget(add_btn)
+
+        main_row.addLayout(right_panel, stretch=2)
+        outer.addLayout(main_row)
 
         self._apply_theme(is_dark)
         self.refresh_events()
@@ -275,7 +288,13 @@ class EventWindow(QWidget):
         current = storage.load_event_window_theme()
         new_theme = "light" if current == "dark" else "dark"
         storage.save_event_window_theme(new_theme)
-        self._apply_theme(new_theme == "dark")
+        is_dark = (new_theme == "dark")
+        self._apply_theme(is_dark)
+        # обновить иконку кнопки
+        for btn in self.findChildren(QPushButton):
+            if btn.objectName() == "themeBtn":
+                btn.setText("🌙" if not is_dark else "☀️")
+                break
 
     def _apply_theme(self, is_dark: bool):
         if is_dark:
