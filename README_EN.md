@@ -1,11 +1,11 @@
 <div align="center">
 
-# 🐾 Pet Reminder v11.0.0
+# 🐾 Pet Reminder v11.0.1
 
 Desktop pet with a smart reminder system  
 Lightweight • Unobtrusive • Always by your side
 
-![version](https://img.shields.io/badge/version-11.0.0-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![version](https://img.shields.io/badge/version-11.0.1-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
 </div>
 
@@ -46,7 +46,7 @@ python pet.py
 
 ### Installation and updates
 
-Download the [latest GitHub release](https://github.com/kaiCATs/pet-reminder/releases/latest) and run `PetReminder_Setup_v11.0.0_GUI.exe`. It installs per-user, without administrator rights or a console window, into `%LOCALAPPDATA%\Programs\PetReminder`.
+Download the [latest GitHub release](https://github.com/kaiCATs/pet-reminder/releases/latest) and run `PetReminder_Setup_v11.0.1_GUI.exe`. It installs per-user, without administrator rights or a console window, into `%LOCALAPPDATA%\Programs\PetReminder`.
 
 User data remains in `%APPDATA%\PetReminder` and is preserved during reinstall or update. The app quietly checks GitHub Releases at startup and can also be checked manually from the tray. A published update must include the GUI installer and its `.sha256` checksum file.
 

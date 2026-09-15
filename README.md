@@ -2,12 +2,12 @@
 
 <img width="200" height="200" alt="Icon" src="https://github.com/user-attachments/assets/2fdfd538-6929-488e-9473-27adb88cd825" />
 
-# 🐾 Pet Reminder v11.0.0
+# 🐾 Pet Reminder v11.0.1
 
 Desktop pet with a smart reminder system  
 Lightweight • Unobtrusive • Always by your side
 
-![version](https://img.shields.io/badge/version-11.0.0-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![version](https://img.shields.io/badge/version-11.0.1-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
 </div>
 
@@ -103,7 +103,7 @@ pyinstaller --noconfirm --clean --onefile --windowed --icon=icon.ico --version-f
 
 <div align="center">
 
-**Version:** 11.0 · **Status:** Stable  
+**Version:** 11.0.1 · **Status:** Stable  
 Made with ❤️ in Python
 
 </div>

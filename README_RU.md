@@ -1,11 +1,11 @@
 <div align="center">
 
-# 🐾 Pet Reminder v11.0.0
+# 🐾 Pet Reminder v11.0.1
 
 Desktop-питомец с системой умных напоминаний  
 Лёгкий • Ненавязчивый • Всегда рядом
 
-![version](https://img.shields.io/badge/version-11.0.0-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![version](https://img.shields.io/badge/version-11.0.1-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
 </div>
 
@@ -46,7 +46,7 @@ python pet.py
 
 ### Установка приложения
 
-Для обычной установки скачайте [последний релиз на GitHub](https://github.com/kaiCATs/pet-reminder/releases/latest) и файл `PetReminder_Setup_v11.0.0_GUI.exe`. Он работает как обычный мастер Windows, без консольного окна, и устанавливает приложение только для текущего пользователя в `%LOCALAPPDATA%\Programs\PetReminder`, поэтому права администратора не нужны.
+Для обычной установки скачайте [последний релиз на GitHub](https://github.com/kaiCATs/pet-reminder/releases/latest) и файл `PetReminder_Setup_v11.0.1_GUI.exe`. Он работает как обычный мастер Windows, без консольного окна, и устанавливает приложение только для текущего пользователя в `%LOCALAPPDATA%\Programs\PetReminder`, поэтому права администратора не нужны.
 
 Пользовательские данные находятся отдельно — в `%APPDATA%\PetReminder` — и не удаляются при переустановке или удалении приложения. Новую версию в дальнейшем можно будет устанавливать поверх предыдущей тем же установщиком.
 
