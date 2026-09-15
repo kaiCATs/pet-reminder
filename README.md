@@ -2,12 +2,12 @@
 
 <img width="200" height="200" alt="Icon" src="https://github.com/user-attachments/assets/2fdfd538-6929-488e-9473-27adb88cd825" />
 
-# 🐾 Pet Reminder v10.2
+# 🐾 Pet Reminder v11.0.0
 
 Desktop pet with a smart reminder system  
 Lightweight • Unobtrusive • Always by your side
 
-![version](https://img.shields.io/badge/version-10.2-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![version](https://img.shields.io/badge/version-11.0.0-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
 </div>
 
@@ -45,6 +45,14 @@ python pet.py
 ```
 
 > Python 3.14+ required. Run from the project root folder.
+
+## Installing the Windows app
+
+Download the [latest release](https://github.com/kaiCATs/pet-reminder/releases/latest) and run the GUI installer. It installs for the current Windows user without a console window or administrator rights.
+
+The app stores user data in `%APPDATA%\PetReminder`; updates and reinstalls keep this folder. Pet Reminder checks GitHub Releases automatically and can also check manually from the tray menu. Each future release must include the GUI installer and its `.sha256` checksum file.
+
+Windows may show an “Unknown publisher” warning until a commercial signing certificate is added. Verify that the installer came from the official release page and use the adjacent SHA-256 file when an integrity check is needed.
 
 ---
 
@@ -95,7 +103,7 @@ pyinstaller --noconfirm --clean --onefile --windowed --icon=icon.ico --version-f
 
 <div align="center">
 
-**Version:** 10.2 · **Status:** Stable  
+**Version:** 11.0 · **Status:** Stable  
 Made with ❤️ in Python
 
 </div>

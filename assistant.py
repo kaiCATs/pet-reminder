@@ -42,8 +42,7 @@ def load_history():
 
 def save_history(history):
     try:
-        with open(storage.HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(history, f, ensure_ascii=False, indent=2)
+        storage._atomic_write_json(storage.HISTORY_FILE, history)
     except Exception as e:
         print(f"[assistant] save_history: {e}")
 
@@ -398,6 +397,25 @@ def parse_repeat(text):
     return None
 
 
+def repeat_key(value) -> str:
+    """Convert chat/localised repeat labels to the storage format."""
+    aliases = {
+        "без повтора": "no_repeat",
+        "no repeat": "no_repeat",
+        "каждый день": "every_day",
+        "every day": "every_day",
+        "каждую неделю": "every_week",
+        "every week": "every_week",
+        "каждый месяц": "every_month",
+        "every month": "every_month",
+        "каждый год": "every_year",
+        "every year": "every_year",
+    }
+    text = str(value or "no_repeat").strip().lower()
+    valid = {"no_repeat", "every_day", "every_week", "every_month", "every_year"}
+    return aliases.get(text, text if text in valid else "no_repeat")
+
+
 def _has_word(text, words):
     """
     Проверяет, есть ли в тексте любое из слов.
@@ -527,6 +545,7 @@ class DialogState:
         self.gender         = None   # "m" / "f" — пол человека (для ДР)
         self.remind_minutes = None   # за сколько минут напомнить (для ДР)
         self.year_asked     = False  # уже спрашивали про возраст/год
+        self.pending_delete = None   # action awaiting explicit confirmation
 
 
 # Глобальное состояние диалога (сбрасывается при каждом новом намерении)
@@ -571,8 +590,8 @@ def _tone_greeting():
 def _is_birthday_event(e):
     """ДР отличается от обычного события признаками 'каждый год' + 'День рождения' в title."""
     title  = (e.get("title") or "").lower()
-    repeat = e.get("repeat", "")
-    return "день рождения" in title or (repeat == "Каждый год" and "рождени" in title)
+    repeat = repeat_key(e.get("repeat", ""))
+    return e.get("kind") == "birthday" or "день рождения" in title or (repeat == "every_year" and "рождени" in title)
 
 
 def handle_show_events(text="", period_days=30):
@@ -678,13 +697,14 @@ def handle_add_event(title, ev_date, ev_time, repeat="Без повтора",
 
     new_event = {
         "title":  title,
+        "kind":   "event",
         "day":    ev_date.day,
         "month":  ev_date.month,
         "year":   ev_date.year,
         "hour":   hour,
         "minute": minute,
         "remind_before_minutes": int(remind_minutes),
-        "repeat": repeat,
+        "repeat": repeat_key(repeat),
     }
 
     events = load_events()
@@ -917,13 +937,14 @@ def handle_add_birthday_full(name, gender, bd_date, birth_year,
 
     new_event = {
         "title":  title,
+        "kind":   "birthday",
         "day":    bd_date.day,
         "month":  bd_date.month,
         "year":   bd_date.year,
         "hour":   hour,
         "minute": minute,
         "remind_before_minutes": int(remind_minutes),
-        "repeat": repeat,
+        "repeat": repeat_key(repeat),
     }
     events = load_events()
     events.append(new_event)
@@ -978,7 +999,62 @@ def handle_add_birthday(name, bd_date, birth_year=None):
     )
 
 
-def handle_delete_event(title_query):
+def _find_birthday_matches(name_query):
+    """Return matching birthday events without changing stored data."""
+    events = load_events()
+    q_low  = name_query.lower()
+    stems  = [q_low]
+    for cut in (1, 2, 3):
+        if len(q_low) - cut >= 2:
+            stems.append(q_low[:-cut])
+
+    def matches(event):
+        if not _is_birthday_event(event):
+            return False
+        title = event["title"].lower()
+        return any(stem in title for stem in stems)
+
+    return [event for event in events if matches(event)], events
+
+
+def _request_delete(kind, query):
+    """Ask for confirmation before a destructive chat action."""
+    if kind == "birthday":
+        matches, _ = _find_birthday_matches(query)
+        not_found = _r(
+            f"Не нашёл день рождения «{query}» 🐾",
+            f"Birthday for '{query}' not found 🐾",
+        )
+        multiple = _r(
+            "Нашёл несколько:\n{}\n\nУточни имя.",
+            "Found multiple:\n{}\n\nPlease be more specific.",
+        )
+    else:
+        matches, _ = handle_find_event(query)
+        not_found = _r(
+            f"Не нашёл событие «{query}» 🐾",
+            f"Event '{query}' not found 🐾",
+        )
+        multiple = _r(
+            "Нашёл несколько событий:\n{}\n\nУточни название.",
+            "Found multiple events:\n{}\n\nPlease be more specific.",
+        )
+
+    if not matches:
+        return not_found
+    if len(matches) > 1:
+        names = "\n".join(f"• {event['title']}" for event in matches)
+        return multiple.format(names)
+
+    _state.pending_delete = {"kind": kind, "title": matches[0]["title"]}
+    question = _r(
+        f"Удалить «{matches[0]['title']}»? Ответь «да» или «нет».",
+        f"Delete '{matches[0]['title']}'? Answer yes or no.",
+    )
+    return question
+
+
+def handle_delete_event(title_query, on_events_changed=None):
     """Удаляет событие по названию (частичное/стемовое совпадение)."""
     matches, events = handle_find_event(title_query)
 
@@ -991,25 +1067,14 @@ def handle_delete_event(title_query):
 
     events.remove(matches[0])
     save_events(events)
+    if on_events_changed:
+        on_events_changed()
     return _r(f"Удалил событие «{matches[0]['title']}» 🐾", f"Deleted event '{matches[0]['title']}' 🐾")
 
 
-def handle_delete_birthday(name_query):
+def handle_delete_birthday(name_query, on_events_changed=None):
     """Удаляет день рождения (ежегодное событие) по имени (стемовый поиск)."""
-    events = load_events()
-    q_low  = name_query.lower()
-    stems  = [q_low]
-    for cut in (1, 2, 3):
-        if len(q_low) - cut >= 2:
-            stems.append(q_low[:-cut])
-
-    def matches(e):
-        if not _is_birthday_event(e):
-            return False
-        t = e["title"].lower()
-        return any(stem in t for stem in stems)
-
-    found = [e for e in events if matches(e)]
+    found, events = _find_birthday_matches(name_query)
 
     if not found:
         return _r(f"Не нашёл день рождения «{name_query}» 🐾", f"Birthday for '{name_query}' not found 🐾")
@@ -1019,6 +1084,8 @@ def handle_delete_birthday(name_query):
 
     events.remove(found[0])
     save_events(events)
+    if on_events_changed:
+        on_events_changed()
     return _r(f"Удалил {found[0]['title']} 🐾", f"Deleted {found[0]['title']} 🐾")
 
 
@@ -1072,7 +1139,7 @@ def handle_edit_event(query, field, new_value, on_events_changed=None):
         event["hour"]   = new_value[0]
         event["minute"] = new_value[1]
     elif field == "repeat":
-        event["repeat"] = new_value
+        event["repeat"] = repeat_key(new_value)
     elif field == "remind":
         event["remind_before_minutes"] = int(new_value)
 
@@ -1114,6 +1181,23 @@ def process_message(text, on_events_changed=None):
 
     pet_name = load_pet_name() or "Питомец"
     text     = expand_slang(text.strip())
+
+    # Destructive actions from chat require an explicit confirmation.
+    if _state.pending_delete:
+        answer = text.lower().strip()
+        yes_words = {"да", "подтверждаю", "удаляй", "yes", "confirm"}
+        no_words  = {"нет", "отмена", "отмени", "не надо", "no", "cancel"}
+        pending = _state.pending_delete
+        if answer in yes_words:
+            _state.pending_delete = None
+            if pending["kind"] == "birthday":
+                return handle_delete_birthday(pending["title"], on_events_changed)
+            return handle_delete_event(pending["title"], on_events_changed)
+        if answer in no_words:
+            _state.reset()
+            return _r("Хорошо, не удаляю 🐾", "Okay, I won't delete it 🐾")
+        # A different command means the user changed their mind.
+        _state.pending_delete = None
 
     # --------------------------------------------------------
     # Если ждём уточнения от пользователя — но если пользователь
@@ -1241,7 +1325,7 @@ def process_message(text, on_events_changed=None):
         # Не передаём EVENT_KEYWORDS в skip — иначе "встреча" → "" (название пропадает)
         title = _extract_title(text, DELETE_KEYWORDS + BIRTHDAY_KEYWORDS)
         if title and len(title) >= 2:
-            return handle_delete_event(title)
+            return _request_delete("event", title)
         _state.waiting_for = "delete_what"
         return _r("Что удалить? Напиши название события или имя (для дня рождения).", "What to delete? Write the event name or person's name (for birthday).")
 
@@ -1258,7 +1342,7 @@ def process_message(text, on_events_changed=None):
             if len(raw) >= 2:
                 name = raw.capitalize()
         if name:
-            return handle_delete_birthday(name)
+            return _request_delete("birthday", name)
         _state.waiting_for = "delete_what"
         return _r("Чей день рождения удалить? Напиши имя.", "Whose birthday should I delete? Write the name.")
 
@@ -1372,10 +1456,10 @@ def _handle_clarification(text, on_events_changed=None):
         clean = re.sub(r"\s+", " ", clean).strip()
         query = clean if len(clean) >= 2 else raw
         _state.reset()
-        bd_result = handle_delete_birthday(query)
+        bd_result = _request_delete("birthday", query)
         if "Не нашёл" not in bd_result:
             return bd_result
-        return handle_delete_event(query)
+        return _request_delete("event", query)
 
     # Редактирование — что редактировать (название события)
     if waiting == "edit_what":

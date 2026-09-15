@@ -1,11 +1,11 @@
 <div align="center">
 
-# 🐾 Pet Reminder v10.2
+# 🐾 Pet Reminder v11.0.0
 
 Desktop pet with a smart reminder system  
 Lightweight • Unobtrusive • Always by your side
 
-![version](https://img.shields.io/badge/version-10.2-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![version](https://img.shields.io/badge/version-11.0.0-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
 </div>
 
@@ -44,6 +44,16 @@ python pet.py
 
 > Python 3.14+ required. Run from the project root folder.
 
+### Installation and updates
+
+Download the [latest GitHub release](https://github.com/kaiCATs/pet-reminder/releases/latest) and run `PetReminder_Setup_v11.0.0_GUI.exe`. It installs per-user, without administrator rights or a console window, into `%LOCALAPPDATA%\Programs\PetReminder`.
+
+User data remains in `%APPDATA%\PetReminder` and is preserved during reinstall or update. The app quietly checks GitHub Releases at startup and can also be checked manually from the tray. A published update must include the GUI installer and its `.sha256` checksum file.
+
+Windows may currently display an “Unknown publisher” warning because the build is not signed with a commercial code-signing certificate yet. Before continuing, confirm that the file came from the [official Pet Reminder release page](https://github.com/kaiCATs/pet-reminder/releases) and that its filename is correct. The adjacent SHA-256 file provides an additional integrity check.
+
+If needed, back up `%APPDATA%\PetReminder` before a major update. Normal updates and reinstalls do not remove this folder.
+
 ---
 
 ## Project Structure
@@ -63,6 +73,7 @@ pet-reminder/
 ├── calendar_widget.py
 ├── birthday_manager.py
 ├── tutorial.py
+├── app_version.py
 ├── config.py
 ├── icon.ico
 ├── Icon.png
@@ -99,7 +110,7 @@ pyinstaller --noconfirm --clean --onefile --windowed ^
 
 <div align="center">
 
-**Version:** 10.2 · **Status:** Stable  
+**Version:** 11.0.0 · **Status:** Stable  
 Made with ❤️ in Python
 
 </div>

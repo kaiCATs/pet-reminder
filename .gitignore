@@ -1,5 +1,9 @@
 ﻿__pycache__/
 *.pyc
+.venv/
+.pytest_cache/
 build/
 dist/
-*.spec
+installer/payload/
+installer/*.exe
+installer/*.sha256

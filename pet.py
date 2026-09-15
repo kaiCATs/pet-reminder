@@ -10,8 +10,8 @@ import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from PyQt5.QtWidgets import QApplication, QLabel, QMessageBox
-from PyQt5.QtCore import Qt, QTimer, QPoint
+from PyQt5.QtWidgets import QApplication, QLabel, QMessageBox, QProgressDialog
+from PyQt5.QtCore import Qt, QTimer, QPoint, QProcess
 from PyQt5.QtGui import QPixmap
 
 import storage
@@ -27,6 +27,7 @@ from event_window import EventWindow
 from tutorial import TutorialManager, NameReminderBubble, PetNameDialog
 from chat_window import ChatWindow
 from locale_app import t
+from updater import UpdateManager
 
 
 # ----------------------------------------------------------------
@@ -36,7 +37,9 @@ if getattr(sys, "frozen", False):
     BASE_PATH = sys._MEIPASS
     EXE_PATH  = sys.executable
 else:
-    BASE_PATH = os.path.abspath(".")
+    # Resolve resources relative to this file, not to the IDE's
+    # current working directory.
+    BASE_PATH = os.path.dirname(os.path.abspath(__file__))
     EXE_PATH  = os.path.abspath(__file__)
 
 
@@ -47,6 +50,7 @@ class Pet(QLabel):
 
     def __init__(self):
         super().__init__()
+        self._shutting_down = False
 
         self.setWindowFlags(
             Qt.FramelessWindowHint |
@@ -109,13 +113,30 @@ class Pet(QLabel):
             on_events   = self._open_events,
             on_tutorial = self._open_tutorial,
             on_rename   = self._open_rename,
-            on_quit     = QApplication.quit,
+            on_updates  = self._check_updates_manual,
+            on_quit     = self._shutdown,
         )
+
+        # The updater checks GitHub in a worker thread so the pet remains
+        # responsive even when the network is unavailable.
+        self._updater = UpdateManager(self)
+        self._updater.update_available.connect(self._on_update_available)
+        self._updater.no_update.connect(self._on_no_update)
+        self._updater.check_failed.connect(self._on_update_check_failed)
+        self._updater.download_progress.connect(self._on_update_progress)
+        self._updater.download_ready.connect(self._on_update_ready)
+        self._updater.download_failed.connect(self._on_update_download_failed)
+        self._update_progress = None
+        self._manual_update_check = False
 
         # --------------------------------------------------------
         # Reminders
         # --------------------------------------------------------
-        self._reminders = ReminderScheduler(self._toasts, parent=self)
+        self._reminders = ReminderScheduler(
+            self._toasts,
+            parent=self,
+            notify=self._tray.show_notification,
+        )
         self._reminders.schedule_all()
 
         # --------------------------------------------------------
@@ -137,6 +158,10 @@ class Pet(QLabel):
         self._offset   = QPoint()
 
         self.show()
+
+        # Give the application time to finish its first-run UI before doing
+        # a quiet background check for a newer GitHub Release.
+        QTimer.singleShot(15_000, self._check_updates_automatic)
 
         # --------------------------------------------------------
         # Tutorial / name
@@ -254,14 +279,154 @@ class Pet(QLabel):
             self._name_bubble = NameReminderBubble(on_name_now=lambda name: None)
 
     # ----------------------------------------------------------------
+    # Updates
+    # ----------------------------------------------------------------
+    def _check_updates_automatic(self):
+        if not self._shutting_down:
+            self._manual_update_check = False
+            self._updater.check()
+
+    def _check_updates_manual(self):
+        if self._shutting_down:
+            return
+        self._manual_update_check = True
+        self._updater.check()
+
+    def _on_no_update(self):
+        if self._manual_update_check and not self._shutting_down:
+            QMessageBox.information(self, t("app_name"), t("update_latest"))
+
+    def _on_update_check_failed(self, _reason):
+        if self._manual_update_check and not self._shutting_down:
+            QMessageBox.warning(self, t("app_name"), t("update_error"))
+
+    def _on_update_available(self, info):
+        if self._shutting_down:
+            return
+        answer = QMessageBox.question(
+            self,
+            t("app_name"),
+            t("update_available", version=info.version),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if answer != QMessageBox.Yes:
+            return
+
+        progress = QProgressDialog(
+            t("update_download"),
+            t("update_cancel"),
+            0,
+            100,
+            self,
+        )
+        progress.setWindowTitle(t("app_name"))
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setAutoClose(False)
+        progress.setMinimumDuration(0)
+        progress.canceled.connect(self._updater.cancel_download)
+        self._update_progress = progress
+        progress.show()
+        if not self._updater.download(info):
+            progress.close()
+            progress.deleteLater()
+            self._update_progress = None
+
+    def _on_update_progress(self, value):
+        if self._update_progress is not None:
+            self._update_progress.setValue(value)
+
+    def _close_update_progress(self):
+        if self._update_progress is None:
+            return
+        self._update_progress.close()
+        self._update_progress.deleteLater()
+        self._update_progress = None
+
+    def _on_update_download_failed(self, reason):
+        self._close_update_progress()
+        if self._shutting_down or reason == "cancelled":
+            return
+        key = "update_checksum_error" if reason in {
+            "checksum_missing", "checksum_mismatch", "invalid_checksum"
+        } else "update_download_error"
+        QMessageBox.warning(self, t("app_name"), t(key))
+
+    def _on_update_ready(self, installer_path):
+        self._close_update_progress()
+        if self._shutting_down:
+            return
+        QMessageBox.information(self, t("app_name"), t("update_ready"))
+        if not QProcess.startDetached(installer_path, []):
+            QMessageBox.warning(self, t("app_name"), t("update_install_error"))
+            return
+        QTimer.singleShot(100, self._shutdown)
+
+    # ----------------------------------------------------------------
     # Lifecycle
     # ----------------------------------------------------------------
     def _save_position(self):
         save_position(self.pos().x(), self.pos().y())
 
+    def _prepare_shutdown(self):
+        """Release every active resource before the Qt loop is stopped."""
+        if self._shutting_down:
+            return
+        self._shutting_down = True
+
+        if hasattr(self, "_anim_timer"):
+            self._anim_timer.stop()
+        if hasattr(self, "_behavior_timer"):
+            self._behavior_timer.stop()
+        if hasattr(self, "_reminders"):
+            self._reminders.stop()
+        if hasattr(self, "_updater"):
+            self._updater.shutdown()
+        self._close_update_progress()
+
+        chat = getattr(self, "_chat_window", None)
+        if chat is not None:
+            if hasattr(chat, "shutdown_for_app"):
+                chat.shutdown_for_app()
+            else:
+                chat.close()
+            self._chat_window = None
+
+        for attr in ("_events_window", "_rename_dialog", "_name_bubble"):
+            window = getattr(self, attr, None)
+            if window is not None:
+                window.close()
+                setattr(self, attr, None)
+
+        tutorial = getattr(self, "_tutorial", None)
+        if tutorial is not None:
+            for attr in ("_window", "_name_dialog"):
+                window = getattr(tutorial, attr, None)
+                if window is None:
+                    continue
+                if hasattr(window, "force_close"):
+                    window.force_close()
+                else:
+                    window.close()
+
+        for toast in self._toasts:
+            toast.close()
+        self._toasts.clear()
+
+        if hasattr(self, "_tray"):
+            self._tray.shutdown()
+        self.hide()
+
+    def _shutdown(self):
+        """Stop the application completely from the tray or the widget."""
+        self._prepare_shutdown()
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
+
     def closeEvent(self, event):
-        QApplication.quit()
-        sys.exit(0)
+        self._shutdown()
+        event.accept()
 
 
 # ================================================================
@@ -272,4 +437,5 @@ if __name__ == "__main__":
     app.setQuitOnLastWindowClosed(False)
     pet = Pet()
     app.aboutToQuit.connect(pet._save_position)
+    app.aboutToQuit.connect(pet._prepare_shutdown)
     sys.exit(app.exec_())

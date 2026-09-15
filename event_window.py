@@ -12,12 +12,13 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QListWidget,
     QListWidgetItem, QDialog, QDialogButtonBox,
-    QTimeEdit, QSpinBox, QFrame, QLineEdit,
+    QTimeEdit, QDateEdit, QSpinBox, QFrame, QLineEdit,
     QComboBox,
 )
 from PyQt5.QtCore import Qt, QDate, QTime
+from PyQt5.QtGui import QColor
 
-from calendar_widget import CustomCalendar
+from calendar_widget import CustomCalendar, StyledCalendar
 from events_manager import load_events, save_events
 import storage
 from locale_app import t, repeat_options, repeat_to_internal, internal_to_display
@@ -48,12 +49,16 @@ class DeleteDialog(QDialog):
         layout.addWidget(buttons)
 
         self.setStyleSheet("""
-        QDialog { background-color: white; border-radius: 12px; }
-        QPushButton {
-            background-color: #0078D7; color: white;
-            border-radius: 8px; padding: 6px 12px;
+        QDialog {
+            background-color: rgba(255,255,255,0.97);
+            border: 1px solid rgba(0,143,149,0.25);
+            border-radius: 16px;
         }
-        QPushButton:hover { background-color: #005ea6; }
+        QPushButton {
+            background-color: #008F95; color: white;
+            border-radius: 10px; padding: 8px 14px;
+        }
+        QPushButton:hover { background-color: #00777B; }
         """)
 
 
@@ -61,11 +66,11 @@ class DeleteDialog(QDialog):
 # ADD / EDIT EVENT DIALOG
 # ================================================================
 class EventDialog(QDialog):
-    def __init__(self, parent=None, existing_event=None):
+    def __init__(self, parent=None, existing_event=None, selected_date=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(400, 380)
+        self.setFixedSize(400, 460)
         self._dragging = False
         self._drag_pos = None
 
@@ -73,7 +78,7 @@ class EventDialog(QDialog):
         title_text = t("ev_edit_title") if is_edit else t("ev_new")
 
         self.container = QFrame(self)
-        self.container.setGeometry(0, 0, 400, 380)
+        self.container.setGeometry(0, 0, 400, 460)
         self.container.setObjectName("container")
 
         layout = QVBoxLayout(self.container)
@@ -91,6 +96,27 @@ class EventDialog(QDialog):
         if is_edit:
             self.name_edit.setText(existing_event.get("title", ""))
         layout.addWidget(self.name_edit)
+
+        self.error_label = QLabel("")
+        self.error_label.setStyleSheet("font-size: 12px; color: #c0392b;")
+        layout.addWidget(self.error_label)
+
+        # Date is editable as well as time. This avoids forcing the user
+        # to delete and recreate an event when plans move.
+        layout.addWidget(QLabel(t("ev_date_label")))
+        self.date_edit = QDateEdit()
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setCalendarWidget(
+            StyledCalendar(theme=storage.load_event_window_theme())
+        )
+        self.date_edit.setDate(
+            QDate(
+                int(existing_event["year"]),
+                int(existing_event["month"]),
+                int(existing_event["day"]),
+            ) if is_edit else (selected_date or QDate.currentDate())
+        )
+        layout.addWidget(self.date_edit)
 
         # Time
         layout.addWidget(QLabel(t("ev_time_label")))
@@ -142,24 +168,27 @@ class EventDialog(QDialog):
         cancel_btn = QPushButton(t("ev_cancel"))
         buttons.addButton(ok_btn,    QDialogButtonBox.AcceptRole)
         buttons.addButton(cancel_btn, QDialogButtonBox.RejectRole)
-        ok_btn.clicked.connect(self.accept)
+        ok_btn.clicked.connect(self._validate_and_accept)
         cancel_btn.clicked.connect(self.reject)
         layout.addWidget(buttons)
 
         self.setStyleSheet("""
         QFrame#container {
             background-color: rgba(255,255,255,0.95);
+            border: 1px solid rgba(0,143,149,0.25);
             border-radius: 20px;
         }
-        QLineEdit, QTimeEdit, QSpinBox, QComboBox {
-            border: 1px solid #ccc; border-radius: 6px;
+        QLineEdit, QDateEdit, QTimeEdit, QSpinBox, QComboBox {
+            border: 1px solid #c9dddd; border-radius: 9px;
             padding: 4px 8px; font-size: 14px; background: white;
         }
+        QLineEdit:focus, QDateEdit:focus, QTimeEdit:focus,
+        QSpinBox:focus, QComboBox:focus { border-color: #008F95; }
         QPushButton {
-            background-color: #0078D7; color: white;
-            border-radius: 8px; padding: 6px 12px;
+            background-color: #008F95; color: white;
+            border-radius: 10px; padding: 8px 14px;
         }
-        QPushButton:hover { background-color: #005ea6; }
+        QPushButton:hover { background-color: #00777B; }
         QLabel { font-size: 13px; color: #333; }
         """)
 
@@ -178,10 +207,18 @@ class EventDialog(QDialog):
     def get_values(self):
         return {
             "name":                  self.name_edit.text().strip(),
+            "date":                  self.date_edit.date(),
             "time":                  self.time_edit.time(),
             "remind_before_minutes": self.remind_hours.value() * 60 + self.remind_minutes.value(),
             "repeat":                repeat_to_internal(self.repeat_combo.currentText()),
         }
+
+    def _validate_and_accept(self):
+        if not self.name_edit.text().strip():
+            self.error_label.setText(t("ev_name_required"))
+            self.name_edit.setFocus()
+            return
+        self.accept()
 
 
 # ================================================================
@@ -200,8 +237,6 @@ class EventWindow(QWidget):
             Qt.FramelessWindowHint | Qt.Window | Qt.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(900, 600)
-
         self.setFixedSize(900, 600)
 
         from PyQt5.QtWidgets import QApplication
@@ -248,7 +283,10 @@ class EventWindow(QWidget):
         cal_frame.setObjectName("calFrame")
         cal_layout = QVBoxLayout(cal_frame)
         cal_layout.setContentsMargins(8, 8, 8, 8)
-        self.calendar = CustomCalendar(self.events)
+        self.calendar = CustomCalendar(
+            self.events,
+            theme="dark" if is_dark else "light",
+        )
         self.calendar.selectionChanged.connect(self.refresh_events)
         cal_layout.addWidget(self.calendar)
         main_row.addWidget(cal_frame, stretch=3)
@@ -257,16 +295,29 @@ class EventWindow(QWidget):
         right_panel = QVBoxLayout()
         right_panel.setSpacing(8)
 
-        events_title = QLabel(t("ev_title"))
-        events_title.setObjectName("eventsTitle")
-        right_panel.addWidget(events_title)
+        self.selected_day_label = QLabel()
+        self.selected_day_label.setObjectName("selectedDayLabel")
+        right_panel.addWidget(self.selected_day_label)
+
+        self.search_edit = QLineEdit()
+        self.search_edit.setObjectName("eventSearch")
+        self.search_edit.setPlaceholderText(t("ev_search_ph"))
+        self.search_edit.textChanged.connect(self.refresh_events)
+        right_panel.addWidget(self.search_edit)
 
         self.events_list = QListWidget()
         self.events_list.setAlternatingRowColors(True)
+        self.events_list.setWordWrap(True)
         self.events_list.itemDoubleClicked.connect(self.edit_event)
         self.events_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.events_list.customContextMenuRequested.connect(self.delete_event)
         right_panel.addWidget(self.events_list, stretch=1)
+
+        self.empty_label = QLabel(t("ev_empty"))
+        self.empty_label.setObjectName("emptyLabel")
+        self.empty_label.setAlignment(Qt.AlignCenter)
+        self.empty_label.setWordWrap(True)
+        right_panel.addWidget(self.empty_label)
 
         hint_lbl = QLabel(t("ev_hint"))
         hint_lbl.setObjectName("hintLabel")
@@ -281,6 +332,7 @@ class EventWindow(QWidget):
         outer.addLayout(main_row)
 
         self._apply_theme(is_dark)
+        self._update_selected_day_label()
         self.refresh_events()
 
     # ----------------------------------------------------------------
@@ -305,9 +357,9 @@ class EventWindow(QWidget):
             list_alt     = "#323232"
             title_color  = "#eee"
             hint_color   = "#888"
-            btn_bg       = "#0078D7"
+            btn_bg       = "#008F95"
             btn_text     = "white"
-            btn_hover    = "#005ea6"
+            btn_hover    = "#00777B"
             top_btn_bg   = "rgba(255,255,255,0.08)"
             top_btn_color = "#ccc"
             top_btn_hover = "rgba(255,255,255,0.15)"
@@ -319,9 +371,9 @@ class EventWindow(QWidget):
             list_alt     = "#f7f7f7"
             title_color  = "#222"
             hint_color   = "#aaa"
-            btn_bg       = "#0078D7"
+            btn_bg       = "#008F95"
             btn_text     = "white"
-            btn_hover    = "#005ea6"
+            btn_hover    = "#00777B"
             top_btn_bg   = "rgba(0,0,0,0.05)"
             top_btn_color = "#555"
             top_btn_hover = "rgba(0,0,0,0.10)"
@@ -329,22 +381,18 @@ class EventWindow(QWidget):
         self.setStyleSheet(f"""
         QFrame#evContainer {{
             background-color: {container_bg};
+            border: 1px solid rgba(0,143,149,0.25);
             border-radius: 20px;
         }}
         QFrame#calFrame {{
             background-color: {cal_frame_bg};
             border-radius: 14px;
         }}
-        QCalendarWidget {{
-            background-color: white; font-size: 16px; color: #222;
+        QLineEdit#eventSearch {{
+            border: 1px solid rgba(0,143,149,0.28); border-radius: 9px;
+            padding: 7px 10px; background: {list_bg}; color: {list_color};
         }}
-        QCalendarWidget QToolButton {{
-            font-size: 18px; height: 40px; color: #222; background-color: transparent;
-        }}
-        QCalendarWidget QMenu {{ font-size: 14px; color: #222; background-color: white; }}
-        QCalendarWidget QWidget#qt_calendar_navigationbar {{
-            min-height: 45px; background-color: #f0f0f0;
-        }}
+        QLineEdit#eventSearch:focus {{ border-color: {btn_bg}; }}
         QListWidget {{
             background-color: {list_bg}; color: {list_color};
             border-radius: 10px; font-size: 15px;
@@ -353,7 +401,9 @@ class EventWindow(QWidget):
         }}
         QListWidget::item:selected {{ background-color: {btn_bg}; color: white; }}
         QLabel#eventsTitle {{ font-size: 20px; font-weight: bold; color: {title_color}; }}
+        QLabel#selectedDayLabel {{ font-size: 16px; font-weight: bold; color: {title_color}; padding: 4px; }}
         QLabel#hintLabel {{ font-size: 11px; color: {hint_color}; }}
+        QLabel#emptyLabel {{ font-size: 14px; color: {hint_color}; padding: 24px; }}
         QPushButton {{ background-color: {btn_bg}; color: {btn_text}; border-radius: 10px; padding: 8px; }}
         QPushButton:hover {{ background-color: {btn_hover}; }}
         QPushButton#themeBtn, QPushButton#closeBtn {{
@@ -364,11 +414,20 @@ class EventWindow(QWidget):
         }}
         """)
 
+        # Apply the calendar last: QCalendarWidget has its own internal
+        # header/view widgets, and the parent window stylesheet must not
+        # overwrite their theme after it has been selected.
+        self.calendar.set_calendar_theme("dark" if is_dark else "light")
+
     def refresh_events(self):
         self.events_list.clear()
         selected_date = self.calendar.selectedDate()
+        query = self.search_edit.text().strip().lower()
+        self._update_selected_day_label()
         for e in self.events:
             if QDate(int(e["year"]), int(e["month"]), int(e["day"])) != selected_date:
+                continue
+            if query and query not in str(e.get("title", "")).lower():
                 continue
             time_str   = f"{int(e.get('hour',0)):02d}:{int(e.get('minute',0)):02d}"
             repeat     = e.get("repeat", "no_repeat")
@@ -389,24 +448,33 @@ class EventWindow(QWidget):
                     remind_str = f"  {t('ev_remind_week')}"
                 else:
                     remind_str = f"  {t('ev_remind_days', d=d)}"
-            item = QListWidgetItem(f"{time_str}  |  {e['title']}{remind_str}{repeat_str}")
+            is_birthday = e.get("kind") == "birthday" or "рождени" in str(e.get("title", "")).lower()
+            marker = "🎂" if is_birthday else "🗓"
+            item = QListWidgetItem(f"{marker}  {time_str}  |  {e['title']}{remind_str}{repeat_str}")
+            item.setForeground(QColor("#C27803" if is_birthday else "#00777B"))
             item.setData(Qt.UserRole, e)
             self.events_list.addItem(item)
+        self.empty_label.setVisible(self.events_list.count() == 0)
+
+    def _update_selected_day_label(self):
+        text = self.calendar.selectedDate().toString("d MMMM")
+        self.selected_day_label.setText(text[:1].upper() + text[1:])
 
     def _notify_changed(self):
         if self.on_events_changed:
             self.on_events_changed()
 
     def add_event(self):
-        dialog = EventDialog(self)
+        dialog = EventDialog(self, selected_date=self.calendar.selectedDate())
         if dialog.exec_() != QDialog.Accepted:
             return
         values = dialog.get_values()
         if not values["name"]:
             return
-        date = self.calendar.selectedDate()
+        date = values["date"]
         self.events.append({
             "title":                 values["name"],
+            "kind":                  "event",
             "day":   date.day(),   "month": date.month(), "year": date.year(),
             "hour":  values["time"].hour(),
             "minute": values["time"].minute(),
@@ -439,6 +507,10 @@ class EventWindow(QWidget):
             return
         e = self.events[idx]
         e["title"]                 = values["name"]
+        date = values["date"]
+        e["day"]                    = date.day()
+        e["month"]                  = date.month()
+        e["year"]                   = date.year()
         e["hour"]                  = values["time"].hour()
         e["minute"]                = values["time"].minute()
         e["remind_before_minutes"] = values["remind_before_minutes"]

@@ -5,12 +5,33 @@
 # ================================================================
 
 from datetime import datetime, timedelta
+from calendar import monthrange
 
 from PyQt5.QtCore import QTimer
 
 from events_manager import load_events
 from birthday_manager import ToastNotification
 from locale_app import t
+import storage
+
+
+def _repeat_key(value: str) -> str:
+    """Accept current keys and localised values from older builds."""
+    aliases = {
+        "без повтора": "no_repeat",
+        "no repeat": "no_repeat",
+        "каждый день": "every_day",
+        "every day": "every_day",
+        "каждую неделю": "every_week",
+        "every week": "every_week",
+        "каждый месяц": "every_month",
+        "every month": "every_month",
+        "каждый год": "every_year",
+        "every year": "every_year",
+    }
+    text = str(value or "no_repeat").strip().lower()
+    valid = {"no_repeat", "every_day", "every_week", "every_month", "every_year"}
+    return aliases.get(text, text if text in valid else "no_repeat")
 
 
 def _delta_string(remind_before: int) -> str:
@@ -45,10 +66,19 @@ def _next_remind_dt(base_dt: datetime, remind_before: int, repeat: str,
         elif repeat == "every_month":
             month = dt.month % 12 + 1
             year  = dt.year + (1 if dt.month == 12 else 0)
-            day   = min(dt.day, [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+            day   = min(dt.day, monthrange(year, month)[1])
             dt    = dt.replace(year=year, month=month, day=day)
         elif repeat == "every_year":
-            dt = dt.replace(year=dt.year + 1)
+            year = dt.year + 1
+            try:
+                dt = dt.replace(year=year)
+            except ValueError:
+                # A 29 February event is observed on 28 February
+                # in a non-leap year.
+                dt = dt.replace(year=year, day=28)
+        else:
+            # Corrupt or legacy values must never create an endless loop.
+            return None
     return dt
 
 
@@ -58,14 +88,18 @@ class ReminderScheduler:
     Pass a list (toast_refs) owned by Pet so Qt doesn't GC the toasts.
     """
 
-    def __init__(self, toast_refs: list, parent=None):
+    def __init__(self, toast_refs: list, parent=None, notify=None):
         self._timers    = []
         self._toasts    = toast_refs
         self._parent    = parent  # QObject parent for QTimer
+        self._notify    = notify
 
     def schedule_all(self):
         """Cancel existing timers and set new ones for all events."""
-        self._timers.clear()
+        self.stop()
+
+        if not storage.notifications_enabled():
+            return
 
         now    = datetime.now()
         events = load_events()
@@ -73,7 +107,7 @@ class ReminderScheduler:
         for e in events:
             try:
                 remind_before = int(e.get("remind_before_minutes", 0))
-                repeat        = e.get("repeat", "no_repeat")
+                repeat        = _repeat_key(e.get("repeat", "no_repeat"))
 
                 base_dt = datetime(
                     int(e["year"]), int(e["month"]), int(e["day"]),
@@ -106,6 +140,13 @@ class ReminderScheduler:
             except Exception as ex:
                 print(f"[reminders] schedule_all: {ex}")
 
+    def stop(self):
+        """Stop and release all reminder timers during rescheduling or exit."""
+        for timer in self._timers:
+            timer.stop()
+            timer.deleteLater()
+        self._timers.clear()
+
     # ----------------------------------------------------------------
     def _make_callback(self, title, hour, minute, remind_before, repeat, base_dt):
         def callback():
@@ -117,8 +158,10 @@ class ReminderScheduler:
             else:
                 body = f"🗓 {title}\n{t('toast_event_now')}"
 
-            toast = ToastNotification(body, color="rgba(30, 90, 160, 230)", offset_y=160)
-            self._toasts.append(toast)
+            delivered = bool(self._notify and self._notify(t("app_name"), body))
+            if not delivered:
+                toast = ToastNotification(body, color="rgba(0, 119, 123, 235)", offset_y=160)
+                self._toasts.append(toast)
 
             if repeat != "no_repeat":
                 self._reschedule_one(title, hour, minute, remind_before, repeat, base_dt)

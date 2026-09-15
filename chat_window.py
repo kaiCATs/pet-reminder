@@ -40,11 +40,11 @@ class _ResizeGrip(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        color = QColor(0, 120, 215, 80) if not self._resizing else QColor(0, 120, 215, 160)
+        color = QColor(0, 143, 149, 80) if not self._resizing else QColor(0, 143, 149, 160)
         p.setBrush(color)
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(0, 0, 24, 24, 6, 6)
-        p.setPen(QColor(0, 120, 215, 200))
+        p.setPen(QColor(0, 143, 149, 200))
         for i in range(3):
             offset = 6 + i * 5
             p.drawLine(offset, 22, 22, offset)
@@ -88,9 +88,11 @@ class MessageThread(QThread):
     def run(self):
         try:
             response = process_message(self.text, lambda: self.events_changed.emit())
-            self.finished.emit(response)
+            if not self.isInterruptionRequested():
+                self.finished.emit(response)
         except Exception as e:
-            self.error_occurred.emit(str(e))
+            if not self.isInterruptionRequested():
+                self.error_occurred.emit(str(e))
 
 
 # ================================================================
@@ -204,9 +206,16 @@ class ClearDialog(QDialog):
         no_btn.clicked.connect(self.reject)
         layout.addWidget(buttons)
         self.setStyleSheet("""
-        QDialog { background-color: white; border-radius: 15px; }
-        QPushButton { background-color: #0078D7; color: white; border-radius: 8px; padding: 6px 12px; }
-        QPushButton:hover { background-color: #005ea6; }
+        QDialog {
+            background-color: rgba(255,255,255,0.97);
+            border: 1px solid rgba(0,143,149,0.25);
+            border-radius: 16px;
+        }
+        QPushButton {
+            background-color: #008F95; color: white;
+            border-radius: 10px; padding: 8px 14px;
+        }
+        QPushButton:hover { background-color: #00777B; }
         """)
 
 
@@ -274,14 +283,28 @@ class SearchDialog(QDialog):
         layout.addLayout(btn_layout)
 
         self.setStyleSheet("""
-        QFrame#container { background-color: rgba(255,255,255,0.97); border-radius: 20px; }
+        QFrame#container {
+            background-color: rgba(255,255,255,0.97);
+            border: 1px solid rgba(0,143,149,0.25);
+            border-radius: 20px;
+        }
         QLabel { font-size: 16px; font-weight: bold; }
-        QLineEdit { border: 1px solid #ccc; border-radius: 6px; padding: 6px 10px; font-size: 14px; }
-        QPushButton { background-color: #0078D7; color: white; border-radius: 8px; padding: 7px 14px; font-size: 13px; }
-        QPushButton:hover { background-color: #005ea6; }
+        QLineEdit {
+            border: 1px solid #c9dddd; border-radius: 9px;
+            padding: 7px 10px; font-size: 14px;
+        }
+        QLineEdit:focus { border-color: #008F95; }
+        QPushButton {
+            background-color: #008F95; color: white;
+            border-radius: 10px; padding: 8px 14px; font-size: 13px;
+        }
+        QPushButton:hover { background-color: #00777B; }
         QPushButton#periodBtn { background-color: #f0f0f0; color: #444; border: 1px solid #ddd; }
-        QPushButton#periodBtn:checked { background-color: #0078D7; color: white; }
-        QPushButton#closeBtn { background-color: transparent; color: #888; border: 1px solid #ddd; }
+        QPushButton#periodBtn:checked { background-color: #008F95; color: white; }
+        QPushButton#closeBtn {
+            background-color: transparent; color: #888;
+            border: 1px solid #c9dddd; border-radius: 10px;
+        }
         """)
 
     def _select_period(self, days, btn):
@@ -359,12 +382,20 @@ class PromptSettingsDialog(QDialog):
         layout.addLayout(btn_layout)
 
         self.setStyleSheet("""
-        QFrame#psContainer { background-color: rgba(255,255,255,0.97); border-radius: 20px; }
-        QComboBox, QTextEdit { border: 1px solid #ddd; border-radius: 8px; padding: 6px 10px; font-size: 14px; background: white; }
+        QFrame#psContainer {
+            background-color: rgba(255,255,255,0.97);
+            border: 1px solid rgba(0,143,149,0.25);
+            border-radius: 20px;
+        }
+        QComboBox, QTextEdit {
+            border: 1px solid #c9dddd; border-radius: 9px;
+            padding: 6px 10px; font-size: 14px; background: white;
+        }
+        QComboBox:focus, QTextEdit:focus { border-color: #008F95; }
         QCheckBox { font-size: 14px; color: #333; }
         QLabel { font-size: 13px; color: #444; }
-        QPushButton { background-color: #0078D7; color: white; border-radius: 9px; padding: 9px 20px; font-size: 14px; }
-        QPushButton:hover { background-color: #005ea6; }
+        QPushButton { background-color: #008F95; color: white; border-radius: 9px; padding: 9px 20px; font-size: 14px; }
+        QPushButton:hover { background-color: #00777B; }
         QPushButton#cancelBtn { background-color: transparent; color: #888; border: 1px solid #ddd; }
         QPushButton#cancelBtn:hover { background-color: #f5f5f5; }
         """)
@@ -417,6 +448,8 @@ class ChatWindow(QWidget):
         self._settings    = storage.load_chat_settings()
         self._font_size   = self._settings.get("font_size", "medium")
         self._is_thinking = False
+        self._closing     = False
+        self._thread      = None
 
         pet_name = storage.load_pet_name() or "Pet"
 
@@ -525,9 +558,13 @@ class ChatWindow(QWidget):
 
     def _apply_style(self):
         self.setStyleSheet("""
-        QFrame#chatContainer { background-color: rgba(255,255,255,0.97); border-radius: 20px; }
+        QFrame#chatContainer {
+            background-color: rgba(255,255,255,0.97);
+            border: 1px solid rgba(0,143,149,0.25);
+            border-radius: 20px;
+        }
         QFrame#chatHeader {
-            background-color: rgba(0,120,215,0.08);
+            background-color: rgba(0,143,149,0.08);
             border-top-left-radius: 20px; border-top-right-radius: 20px;
             border-bottom: 1px solid rgba(0,0,0,0.06);
         }
@@ -536,13 +573,13 @@ class ChatWindow(QWidget):
             border-top: 1px solid rgba(0,0,0,0.06);
             border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
         }
-        QLineEdit { border: 1px solid #ddd; border-radius: 18px; padding: 6px 14px; font-size: 14px; background: white; }
-        QLineEdit:focus { border-color: #0078D7; }
-        QPushButton#sendBtn { background-color: #0078D7; color: white; border-radius: 18px; font-size: 16px; }
-        QPushButton#sendBtn:hover { background-color: #005ea6; }
-        QPushButton#headerBtn { background-color: transparent; color: #555; border-radius: 6px; font-size: 13px; }
-        QPushButton#headerBtn:hover { background-color: rgba(0,0,0,0.06); }
-        QPushButton#closeBtn { background-color: transparent; color: #888; border-radius: 6px; font-size: 14px; }
+        QLineEdit { border: 1px solid #c9dddd; border-radius: 18px; padding: 6px 14px; font-size: 14px; background: white; }
+        QLineEdit:focus { border-color: #008F95; }
+        QPushButton#sendBtn { background-color: #008F95; color: white; border-radius: 18px; font-size: 16px; }
+        QPushButton#sendBtn:hover { background-color: #00777B; }
+        QPushButton#headerBtn { background-color: rgba(0,143,149,0.08); color: #00777B; border-radius: 9px; font-size: 13px; }
+        QPushButton#headerBtn:hover { background-color: rgba(0,143,149,0.18); }
+        QPushButton#closeBtn { background-color: transparent; color: #888; border-radius: 9px; font-size: 14px; }
         QPushButton#closeBtn:hover { background-color: #e81123; color: white; }
         """)
 
@@ -617,11 +654,11 @@ class ChatWindow(QWidget):
                 btn.setCursor(Qt.PointingHandCursor)
                 btn.setStyleSheet("""
                     QPushButton#quickBtn {
-                        background-color: rgba(0,120,215,0.10); color: #0078D7;
-                        border: 1px solid rgba(0,120,215,0.35);
+                        background-color: rgba(0,143,149,0.10); color: #008F95;
+                        border: 1px solid rgba(0,143,149,0.35);
                         border-radius: 14px; padding: 6px 14px; font-size: 13px;
                     }
-                    QPushButton#quickBtn:hover { background-color: rgba(0,120,215,0.20); }
+                    QPushButton#quickBtn:hover { background-color: rgba(0,143,149,0.20); }
                 """)
                 btn.clicked.connect(make_handler(label, container))
                 row.addWidget(btn)
@@ -732,17 +769,23 @@ class ChatWindow(QWidget):
     # ----------------------------------------------------------------
     # FONT / SEARCH / CLEAR
     # ----------------------------------------------------------------
+    def _set_font_size(self, size_key):
+        self._font_size = size_key
+        for bubble in self.findChildren(MessageBubble):
+            bubble.set_font_size(self._font_size)
+        self._save_settings()
+
     def _font_smaller(self):
         keys = list(FONT_SIZES.keys())
         idx  = keys.index(self._font_size)
         if idx > 0:
-            self._font_size = keys[idx - 1]; self._save_settings()
+            self._set_font_size(keys[idx - 1])
 
     def _font_larger(self):
         keys = list(FONT_SIZES.keys())
         idx  = keys.index(self._font_size)
         if idx < len(keys) - 1:
-            self._font_size = keys[idx + 1]; self._save_settings()
+            self._set_font_size(keys[idx + 1])
 
     def _open_search(self):
         self._search_dialog = SearchDialog(self); self._search_dialog.show()
@@ -772,7 +815,39 @@ class ChatWindow(QWidget):
         storage.save_chat_settings(s)
 
     def _on_close(self):
-        self._save_settings(); self.close()
+        self.shutdown_for_app()
+
+    def _stop_worker(self):
+        thread = self._thread
+        if thread is None or not thread.isRunning():
+            return
+
+        thread.requestInterruption()
+        thread.quit()
+        if not thread.wait(1500):
+            # The assistant currently performs only local work, but a hard
+            # fallback keeps a future slow operation from holding the app
+            # process open after the user has chosen Exit.
+            thread.terminate()
+            thread.wait(1000)
+
+    def shutdown_for_app(self):
+        """Close the chat and finish its worker before QApplication exits."""
+        if self._closing:
+            return
+        self._closing = True
+        if hasattr(self, "_indicator"):
+            self._indicator.stop()
+        self._stop_worker()
+        self.close()
+
+    def closeEvent(self, event):
+        self._closing = True
+        if hasattr(self, "_indicator"):
+            self._indicator.stop()
+        self._stop_worker()
+        self._save_settings()
+        event.accept()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:

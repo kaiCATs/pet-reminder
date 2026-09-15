@@ -4,6 +4,9 @@
 # Uses storage (replaces config) and locale_app for all strings.
 # ================================================================
 
+import os
+import sys
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit,
@@ -14,7 +17,7 @@ from PyQt5.QtCore import (
     Qt, QTimer, QPropertyAnimation,
     QEasingCurve, QPoint, QRect,
 )
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap
 
 import storage
 from locale_app import t
@@ -49,6 +52,12 @@ _STEP_KEYS = [
 ]
 
 
+def _resource_path(name: str) -> str:
+    """Resolve bundled resources both from source and a PyInstaller build."""
+    root = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(root, name)
+
+
 # ================================================================
 # PET NAME DIALOG
 # ================================================================
@@ -56,12 +65,14 @@ class PetNameDialog(QWidget):
     def __init__(self, on_name_saved=None):
         super().__init__()
         self.on_name_saved = on_name_saved
+        self._force_close = False
+        self._saving = False
 
         self.setWindowFlags(
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Window
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(440, 300)
+        self.setFixedSize(440, 380)
 
         screen = QApplication.primaryScreen().availableGeometry()
         self.move(
@@ -70,12 +81,21 @@ class PetNameDialog(QWidget):
         )
 
         self.container = QFrame(self)
-        self.container.setGeometry(0, 0, 440, 300)
+        self.container.setGeometry(0, 0, 440, 380)
         self.container.setObjectName("container")
 
         layout = QVBoxLayout(self.container)
         layout.setSpacing(15)
         layout.setContentsMargins(35, 35, 35, 35)
+
+        logo = QLabel()
+        logo.setAlignment(Qt.AlignCenter)
+        logo_pixmap = QPixmap(_resource_path("Icon.png"))
+        if not logo_pixmap.isNull():
+            logo.setPixmap(logo_pixmap.scaled(
+                76, 76, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            ))
+        layout.addWidget(logo)
 
         title = QLabel(t("name_title"))
         title.setAlignment(Qt.AlignCenter)
@@ -111,23 +131,24 @@ class PetNameDialog(QWidget):
         self.setStyleSheet("""
         QFrame#container {
             background-color: rgba(255,255,255,0.97);
+            border: 1px solid rgba(0,143,149,0.25);
             border-radius: 20px;
         }
         QLineEdit {
-            border: 2px solid #0078D7;
+            border: 2px solid #008F95;
             border-radius: 8px;
             padding: 10px 14px;
             font-size: 16px;
         }
-        QLineEdit:focus { border-color: #005ea6; }
+        QLineEdit:focus { border-color: #00777B; }
         QPushButton {
-            background-color: #0078D7;
+            background-color: #008F95;
             color: white;
             border-radius: 10px;
             padding: 12px;
             font-size: 15px;
         }
-        QPushButton:hover { background-color: #005ea6; }
+        QPushButton:hover { background-color: #00777B; }
         """)
 
     def _fade_in(self):
@@ -141,6 +162,9 @@ class PetNameDialog(QWidget):
         self._anim.start()
 
     def _save(self):
+        if self._saving:
+            return
+
         name = self.name_input.text().strip()
         if not name:
             self.error_label.setText(t("name_empty"))
@@ -152,17 +176,31 @@ class PetNameDialog(QWidget):
             self.error_label.setText(t("name_bad"))
             return
 
+        self._saving = True
+        self.save_btn.setEnabled(False)
+        self.name_input.setEnabled(False)
+
         storage.save_pet_name(name)
         self.error_label.setText("")
-        if self.on_name_saved:
-            self.on_name_saved(name)
+        callback = self.on_name_saved
+        self.on_name_saved = None
         self.close()
+        self.deleteLater()
+        if callback:
+            # Let Qt finish hiding/deleting this window before opening the
+            # next one. This prevents stacked tutorials on double-click.
+            QTimer.singleShot(0, lambda: callback(name))
 
     def closeEvent(self, event):
-        if storage.load_pet_name() is None:
-            event.ignore()
-        else:
+        if self._force_close or storage.load_pet_name() is not None:
             event.accept()
+        else:
+            event.ignore()
+
+    def force_close(self):
+        """Allow application shutdown even when the name is still empty."""
+        self._force_close = True
+        self.close()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -268,7 +306,7 @@ class TutorialWindow(QWidget):
         for i in range(len(_STEP_KEYS)):
             dot = QLabel("●" if i == self._current_index else "○")
             dot.setStyleSheet(
-                "font-size: 14px; color: #0078D7;" if i == self._current_index
+                "font-size: 14px; color: #008F95;" if i == self._current_index
                 else "font-size: 14px; color: #ccc;"
             )
             self._dots_layout.insertWidget(i + 1, dot)
@@ -279,16 +317,16 @@ class TutorialWindow(QWidget):
         QFrame#tutContainer {
             background-color: rgba(255,255,255,0.97);
             border-radius: 20px;
-            border: 1px solid rgba(0,120,215,0.25);
+            border: 1px solid rgba(0,143,149,0.25);
         }
         QPushButton {
-            background-color: #0078D7;
+            background-color: #008F95;
             color: white;
             border-radius: 9px;
             padding: 9px 20px;
             font-size: 14px;
         }
-        QPushButton:hover { background-color: #005ea6; }
+        QPushButton:hover { background-color: #00777B; }
         QPushButton#skipBtn {
             background-color: transparent;
             color: #999;
@@ -386,8 +424,12 @@ class TutorialManager:
     def __init__(self, on_finished=None, skip_name=False):
         self.on_finished = on_finished
         self.skip_name   = skip_name
+        self._started     = False
 
     def start(self):
+        if self._started:
+            return
+        self._started = True
         if self.skip_name or storage.load_pet_name() is not None:
             self._window = TutorialWindow(on_finished=self._on_finished)
         else:
@@ -440,13 +482,14 @@ class NameReminderBubble(QWidget):
         self.setStyleSheet("""
         QFrame#bubble {
             background-color: rgba(40,40,40,230);
+            border: 1px solid rgba(0,143,149,0.35);
             border-radius: 15px;
         }
         QPushButton {
-            background-color: #0078D7; color: white;
+            background-color: #008F95; color: white;
             border-radius: 8px; padding: 7px; font-size: 14px;
         }
-        QPushButton:hover { background-color: #005ea6; }
+        QPushButton:hover { background-color: #00777B; }
         """)
 
         self.move(end_x, screen.bottom() + 10)

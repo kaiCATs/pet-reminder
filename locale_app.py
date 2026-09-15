@@ -10,16 +10,42 @@ import storage
 
 _STRINGS = {
     # ---- Tray ----
+    "app_name":             {"ru": "Pet Reminder",              "en": "Pet Reminder"},
     "tray_show":            {"ru": "🐾 Показать зверька",      "en": "🐾 Show pet"},
     "tray_hide":            {"ru": "📥 Скрыть в трей",         "en": "📥 Hide to tray"},
     "tray_events":          {"ru": "🗓 События",                "en": "🗓 Events"},
+    "tray_notifications_on":  {"ru": "🔔 Уведомления включены",  "en": "🔔 Notifications on"},
+    "tray_notifications_off": {"ru": "🔕 Уведомления выключены", "en": "🔕 Notifications off"},
+    "tray_backup":          {"ru": "💾 Создать резервную копию", "en": "💾 Create backup"},
+    "tray_backup_done":     {"ru": "Резервная копия создана",    "en": "Backup created"},
+    "tray_backup_error":    {"ru": "Не удалось создать копию",   "en": "Backup failed"},
     "tray_autostart_on":    {"ru": "✅ Автозапуск включён",    "en": "✅ Autostart enabled"},
     "tray_autostart_off":   {"ru": "⬜ Автозапуск выключен",   "en": "⬜ Autostart disabled"},
     "tray_tutorial":        {"ru": "❓ Туториал",              "en": "❓ Tutorial"},
     "tray_rename":          {"ru": "🏷️ Сменить имя питомца",  "en": "🏷️ Rename pet"},
     "tray_lang":            {"ru": "🌐 Язык: RU",              "en": "🌐 Language: EN"},
+    "tray_updates":         {"ru": "🔄 Проверить обновления",   "en": "🔄 Check for updates"},
     "tray_version":         {"ru": "Версия: {v}",              "en": "Version: {v}"},
     "tray_exit":            {"ru": "❌ Выход",                 "en": "❌ Exit"},
+
+    # ---- Updates ----
+    "update_checking":      {"ru": "Проверяю обновления...",    "en": "Checking for updates..."},
+    "update_latest":        {"ru": "Новых обновлений пока нет.",
+                              "en": "There are no newer updates yet."},
+    "update_available":     {"ru": "Доступна новая версия {version}.\n\nОбновить Pet Reminder сейчас?",
+                              "en": "A new version {version} is available.\n\nUpdate Pet Reminder now?"},
+    "update_download":      {"ru": "Скачиваю обновление...",    "en": "Downloading update..."},
+    "update_ready":         {"ru": "Обновление скачано и проверено.\nПриложение сейчас закроется, затем откроется установщик.",
+                              "en": "The update was downloaded and verified.\nThe app will close and the installer will open."},
+    "update_error":         {"ru": "Не удалось проверить обновления.",
+                              "en": "Could not check for updates."},
+    "update_download_error": {"ru": "Не удалось скачать обновление.",
+                              "en": "Could not download the update."},
+    "update_checksum_error": {"ru": "Обновление не прошло проверку безопасности.",
+                              "en": "The update failed its security check."},
+    "update_cancel":        {"ru": "Отмена",                    "en": "Cancel"},
+    "update_install_error": {"ru": "Не удалось запустить установщик.",
+                              "en": "Could not start the installer."},
 
     # ---- Toast notifications ----
     "toast_event_now":      {"ru": "Начинается сейчас!",       "en": "Starting now!"},
@@ -36,10 +62,15 @@ _STRINGS = {
     "ev_delete_q":          {"ru": "Удалить событие?",         "en": "Delete event?"},
     "ev_delete_ok":         {"ru": "Удалить",                  "en": "Delete"},
     "ev_cancel":            {"ru": "Отмена",                   "en": "Cancel"},
+    "ev_empty":             {"ru": "На эту дату событий нет.\nДобавьте первое напоминание.",
+                              "en": "No events on this date.\nAdd your first reminder."},
+    "ev_search_ph":         {"ru": "Поиск по событиям...",      "en": "Search events..."},
     "ev_new":               {"ru": "Новое событие",            "en": "New event"},
     "ev_edit_title":        {"ru": "Редактировать событие",    "en": "Edit event"},
     "ev_name_label":        {"ru": "Название:",                "en": "Title:"},
     "ev_name_ph":           {"ru": "Введите название...",      "en": "Enter title..."},
+    "ev_name_required":     {"ru": "Введите название события",  "en": "Enter an event title"},
+    "ev_date_label":        {"ru": "Дата события:",             "en": "Event date:"},
     "ev_time_label":        {"ru": "Время события:",           "en": "Event time:"},
     "ev_remind_label":      {"ru": "Напомнить за:",            "en": "Remind before:"},
     "ev_repeat_label":      {"ru": "Повтор:",                  "en": "Repeat:"},
@@ -207,9 +238,25 @@ def repeat_options() -> list:
 
 def repeat_to_internal(display: str) -> str:
     """Display string → internal key."""
+    if display in {"no_repeat", "every_day", "every_week", "every_month", "every_year"}:
+        return display
     for ik, lk in REPEAT_KEYS:
         if t(lk) == display:
             return ik
+    legacy = {
+        "Без повтора": "no_repeat",
+        "Каждый день": "every_day",
+        "Каждую неделю": "every_week",
+        "Каждый месяц": "every_month",
+        "Каждый год": "every_year",
+        "No repeat": "no_repeat",
+        "Every day": "every_day",
+        "Every week": "every_week",
+        "Every month": "every_month",
+        "Every year": "every_year",
+    }
+    if display in legacy:
+        return legacy[display]
     return "no_repeat"
 
 

@@ -1,11 +1,11 @@
 <div align="center">
 
-# 🐾 Pet Reminder v10.2
+# 🐾 Pet Reminder v11.0.0
 
 Desktop-питомец с системой умных напоминаний  
 Лёгкий • Ненавязчивый • Всегда рядом
 
-![version](https://img.shields.io/badge/version-10.2-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
+![version](https://img.shields.io/badge/version-11.0.0-blue) ![python](https://img.shields.io/badge/python-3.14+-yellow) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![status](https://img.shields.io/badge/status-stable-brightgreen)
 
 </div>
 
@@ -44,6 +44,22 @@ python pet.py
 
 > Требуется Python 3.14+. Запускать из корневой папки проекта.
 
+### Установка приложения
+
+Для обычной установки скачайте [последний релиз на GitHub](https://github.com/kaiCATs/pet-reminder/releases/latest) и файл `PetReminder_Setup_v11.0.0_GUI.exe`. Он работает как обычный мастер Windows, без консольного окна, и устанавливает приложение только для текущего пользователя в `%LOCALAPPDATA%\Programs\PetReminder`, поэтому права администратора не нужны.
+
+Пользовательские данные находятся отдельно — в `%APPDATA%\PetReminder` — и не удаляются при переустановке или удалении приложения. Новую версию в дальнейшем можно будет устанавливать поверх предыдущей тем же установщиком.
+
+При запуске приложение тихо проверяет GitHub Releases. Проверить вручную можно через меню трея → «Проверить обновления». Если найдена новая версия, приложение спросит разрешение, скачает установщик, проверит его SHA-256 и запустит обновление.
+
+Для публикации новой версии в GitHub Release нужно прикрепить графический установщик и его файл `.sha256`. Без контрольной суммы приложение не будет устанавливать пакет.
+
+Если Windows показывает предупреждение «Неизвестный издатель», проверьте, что файл скачан со страницы [официального релиза Pet Reminder](https://github.com/kaiCATs/pet-reminder/releases), а имя файла совпадает с указанным выше. Текущие сборки ещё не подписаны коммерческим сертификатом, поэтому такое предупреждение возможно. SHA-256 рядом с установщиком позволяет дополнительно проверить целостность файла.
+
+Перед крупным обновлением при необходимости можно сделать резервную копию папки `%APPDATA%\PetReminder`. Обычное обновление и переустановка эту папку не удаляют.
+
+Пересобрать графический установщик после новой сборки можно скриптом `installer\build_gui_installer.ps1`.
+
 ---
 
 ## Структура проекта
@@ -63,6 +79,8 @@ pet-reminder/
 ├── calendar_widget.py
 ├── birthday_manager.py
 ├── tutorial.py
+├── app_version.py
+├── updater.py
 ├── config.py
 ├── icon.ico
 ├── Icon.png
@@ -99,7 +117,7 @@ pyinstaller --noconfirm --clean --onefile --windowed ^
 
 <div align="center">
 
-**Версия:** 10.2 · **Статус:** Stable  
+**Версия:** 11.0.0 · **Статус:** Stable  
 Made with ❤️ in Python
 
 </div>

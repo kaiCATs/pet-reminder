@@ -3,13 +3,8 @@
 # Содержит только утилиты склонений и универсальный тост.
 # Дни рождения теперь хранятся в events.json как ежегодные события.
 # ================================================================
-import os
-
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QPoint
-
-from config import app_dir
-
 
 # ================================================================
 # СКЛОНЕНИЯ ЧИСЛИТЕЛЬНЫХ
