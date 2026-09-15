@@ -106,6 +106,16 @@ pyinstaller --noconfirm --clean --onefile --windowed ^
 
 > Autostart only works in the compiled `.exe`.
 
+### Automated releases
+
+The repository includes a GitHub Actions workflow for Windows releases:
+
+1. Update `APP_VERSION` in `app_version.py` and the versions in `version.txt`.
+2. Commit the changes to `main`.
+3. Create and push a matching tag, for example `v11.0.2`.
+
+GitHub then builds the EXE and GUI installer, creates the SHA-256 file, verifies the package, and publishes the Release automatically. No manual file upload is required. When a trusted certificate is available, add it to repository Secrets as `PETREMINDER_SIGN_CERT_BASE64` and `PETREMINDER_SIGN_CERT_PASSWORD`.
+
 ---
 
 <div align="center">
